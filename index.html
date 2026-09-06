@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTS Trainer — SPINS + Academics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0E1826;
+    --navy-deep:#080F1A;
+    --navy-line:#233348;
+    --gold:#C9A227;
+    --paper:#E9E3D3;
+    --paper-line:#8C8571;
+    --ink:#1B1B18;
+    --excellence:#4A7C59;
+    --discrepancy:#A8392E;
+    --dim:#8296AE;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--navy);
+    color:#DCE5EF;
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .label{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:10px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--dim);
+  }
+  .wrap{max-width:780px;margin:0 auto;padding:20px 16px 64px}
+
+  /* ── masthead ── */
+  header.mast{
+    display:flex;align-items:baseline;gap:12px;
+    border-bottom:1px solid var(--navy-line);
+    padding-bottom:12px;margin-bottom:18px;flex-wrap:wrap;
+  }
+  header.mast h1{
+    font-family:"Oswald",sans-serif;font-weight:600;
+    font-size:clamp(20px,5vw,28px);letter-spacing:.04em;
+    text-transform:uppercase;margin:0;color:#F2F5F9;
+  }
+  header.mast .sub{margin-left:auto}
+
+  /* ── deck tabs ── */
+  .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+  .tab{
+    flex:1 1 102px;padding:11px 10px;background:var(--navy-deep);
+    border:1px solid var(--navy-line);border-radius:2px;color:#9FB2C6;cursor:pointer;
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.05em;
+    text-transform:uppercase;transition:border-color .12s,color .12s,background .12s;
+  }
+  .tab:hover,.tab:focus-visible{border-color:var(--gold);color:#fff}
+  .tab.active{border-color:var(--gold);color:var(--gold);background:#0C1524}
+
+  /* ── part picker ── */
+  .picker-intro{margin:0 0 14px;font-size:14px;color:#A9BACC;line-height:1.5}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+  .tile{
+    display:block;width:100%;text-align:left;cursor:pointer;
+    background:var(--navy-deep);border:1px solid var(--navy-line);
+    border-radius:2px;padding:11px 12px 10px;color:inherit;
+    font-family:inherit;transition:border-color .12s,background .12s;
+  }
+  .tile:hover,.tile:focus-visible{border-color:var(--gold);background:#0C1524}
+  .tile .top{display:flex;align-items:baseline;gap:8px}
+  .tile .num{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+    color:var(--gold);letter-spacing:.08em;
+  }
+  .tile .name{
+    font-family:"Oswald",sans-serif;font-size:15px;font-weight:500;
+    letter-spacing:.02em;color:#EDF2F8;line-height:1.2;
+  }
+  .tile .meta{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
+  .bar{height:2px;background:#1C2839;margin-top:8px;overflow:hidden}
+  .bar span{display:block;height:100%;background:var(--gold);width:0}
+  .tile.wide{grid-column:1/-1;border-color:#2E4260}
+  .tile.wide .name{font-size:17px}
+
+  /* empty-bank notice (missing or unreadable data file) */
+  .banknote{
+    grid-column:1/-1;border:1px solid var(--discrepancy);border-radius:2px;
+    background:#150F0E;padding:16px 18px;
+  }
+  .banknote p{margin:6px 0 0;font-size:14px;line-height:1.55;color:#D8C6C2}
+  .banknote code{
+    font-family:"IBM Plex Mono",monospace;font-size:.9em;
+    background:#241614;padding:1px 5px;border-radius:2px;color:#EDA298;
+  }
+
+  /* ── drill bar ── */
+  .drillbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--navy-line);
+  }
+  .drillbar .title{
+    font-family:"Oswald",sans-serif;font-size:16px;letter-spacing:.03em;
+    text-transform:uppercase;color:#F2F5F9;
+  }
+  .drillbar .count{margin-left:auto}
+  .drillbar .spacer{margin-left:auto}
+  button.ghost{
+    background:none;border:1px solid var(--navy-line);color:#B6C6D6;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;padding:6px 10px;border-radius:2px;cursor:pointer;
+  }
+  button.ghost:hover,button.ghost:focus-visible{border-color:var(--gold);color:#fff}
+
+  /* ── the 341 card (signature) ── */
+  .form341{
+    background:var(--paper);color:var(--ink);
+    border:2px solid var(--ink);border-radius:1px;
+    box-shadow:6px 6px 0 rgba(0,0,0,.35);
+    padding:10px;
+  }
+  .form341 .inner{border:1px solid var(--ink)}
+  .f-title{
+    text-align:center;font-family:"Oswald",sans-serif;font-weight:500;
+    font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+    padding:7px 6px;border-bottom:1px solid var(--ink);
+  }
+  .f-row{display:flex;border-bottom:1px solid var(--ink)}
+  .f-cell{padding:5px 8px 7px;flex:1;min-width:0}
+  .f-cell + .f-cell{border-left:1px solid var(--ink)}
+  .f-cell .cap{
+    font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:#5C574A;display:block;margin-bottom:2px;
+  }
+  .f-cell .val{
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.03em;
+    text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .f-cell .val.wrap{white-space:normal;overflow:visible;text-transform:none;font-size:12px;line-height:1.35;letter-spacing:.01em}
+  .f-body{padding:0}
+  .f-body .cap{
+    display:block;text-align:center;font-family:"IBM Plex Mono",monospace;
+    font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:#5C574A;
+    padding:5px 6px;border-bottom:1px solid #B9B2A0;
+  }
+  .qbox{padding:20px 18px;min-height:150px}
+  .qtext{font-size:19px;line-height:1.4;font-weight:500;margin:0}
+  .abox{
+    margin-top:16px;padding-top:14px;border-top:1px dashed var(--paper-line);
+  }
+  .abox .alabel{
+    font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:#5C574A;display:block;margin-bottom:6px;
+  }
+  .atext{font-size:16px;line-height:1.55;margin:0;white-space:pre-wrap}
+  .f-foot{
+    display:flex;justify-content:space-between;gap:10px;
+    font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;
+    text-transform:uppercase;color:#5C574A;padding:6px 8px;
+  }
+  .reveal-hint{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:#6E6857;margin-top:16px;
+  }
+
+  /* ── multiple-choice options (paper-themed) ── */
+  .opts{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+  .opt{
+    display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;
+    background:#F3EEE0;border:1px solid var(--paper-line);border-radius:2px;
+    padding:11px 13px;cursor:pointer;color:var(--ink);
+    font-family:"IBM Plex Sans",sans-serif;font-size:15px;line-height:1.4;
+    transition:border-color .12s,background .12s;
+  }
+  .opt:hover:not(:disabled){border-color:var(--ink);background:#EFE8D6}
+  .opt .lt{font-family:"IBM Plex Mono",monospace;font-weight:600;color:#6E6857;flex:0 0 auto}
+  .opt:disabled{cursor:default}
+  .opt.correct{border-color:var(--excellence);background:#D8E8DD}
+  .opt.correct .lt{color:var(--excellence)}
+  .opt.wrong{border-color:var(--discrepancy);background:#F0D9D5}
+  .opt.wrong .lt{color:var(--discrepancy)}
+
+  /* ── grading (flashcards) ── */
+  .grade{display:flex;gap:8px;margin-top:14px}
+  .grade button{
+    flex:1;padding:14px 10px;border:1px solid;border-radius:2px;cursor:pointer;
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.08em;
+    text-transform:uppercase;background:none;
+  }
+  .grade .ok{border-color:var(--excellence);color:#93D0A6}
+  .grade .ok:hover,.grade .ok:focus-visible{background:var(--excellence);color:#fff}
+  .grade .no{border-color:var(--discrepancy);color:#EDA298}
+  .grade .no:hover,.grade .no:focus-visible{background:var(--discrepancy);color:#fff}
+  .grade button small{
+    display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;
+    letter-spacing:.12em;opacity:.7;margin-top:3px;
+  }
+  .revealbtn{
+    width:100%;margin-top:14px;padding:14px;border:1px solid var(--gold);
+    background:none;color:var(--gold);border-radius:2px;cursor:pointer;
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+  }
+  .revealbtn:hover,.revealbtn:focus-visible{background:var(--gold);color:var(--navy-deep)}
+
+  /* ── summary ── */
+  .summary{border:1px solid var(--navy-line);background:var(--navy-deep);padding:22px;border-radius:2px}
+  .summary h2{
+    font-family:"Oswald",sans-serif;font-weight:500;font-size:20px;
+    letter-spacing:.05em;text-transform:uppercase;margin:0 0 4px;
+  }
+  .score{font-family:"Oswald",sans-serif;font-size:52px;line-height:1;color:var(--gold);margin:14px 0 2px}
+  .summary ul{margin:16px 0 0;padding-left:18px;font-size:14px;line-height:1.6;color:#B6C6D6}
+  .summary .actions{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+
+  footer.foot{
+    margin-top:36px;padding-top:14px;border-top:1px solid var(--navy-line);
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  }
+  :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .hidden{display:none !important}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important}}
+  @media (max-width:480px){
+    .f-row.stack{flex-direction:column}
+    .f-row.stack .f-cell + .f-cell{border-left:none;border-top:1px solid var(--ink)}
+    .qbox{padding:16px 14px}
+    .qtext{font-size:17px}
+  }
+
+  /* ── practice test ── */
+  .tsetup{border:1px solid var(--navy-line);background:var(--navy-deep);padding:22px;border-radius:2px}
+  .tsetup h2{
+    font-family:"Oswald",sans-serif;font-weight:500;font-size:22px;
+    letter-spacing:.04em;text-transform:uppercase;margin:2px 0 0;color:#F2F5F9;
+  }
+  .setup-label{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim);display:block;margin:14px 0 6px;
+  }
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{
+    flex:1;min-width:64px;padding:11px 10px;background:var(--navy);
+    border:1px solid var(--navy-line);border-radius:2px;color:#B6C6D6;cursor:pointer;
+    font-family:"IBM Plex Mono",monospace;font-size:13px;letter-spacing:.06em;
+    transition:border-color .12s,color .12s,background .12s;
+  }
+  .seg button:hover{border-color:var(--gold);color:#fff}
+  .seg button.sel{border-color:var(--gold);color:var(--gold);background:#0C1524}
+  .seg button:disabled{opacity:.4;cursor:not-allowed}
+  .seg button:disabled:hover{border-color:var(--navy-line);color:#B6C6D6}
+  .timer{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--gold);letter-spacing:.08em}
+  .opt.sel{border-color:var(--gold);background:#EFE6C8}
+  .opt.sel .lt{color:#8A6D12}
+  .breakdown{margin-top:8px}
+  .brow{
+    display:flex;justify-content:space-between;gap:10px;padding:7px 0;
+    border-bottom:1px solid #172232;font-size:13px;color:#C3D2E2;
+  }
+  .brow .bmod{color:#E7EEF6}
+  .brow .bpct{font-family:"IBM Plex Mono",monospace;color:var(--gold);white-space:nowrap}
+  .passtag{
+    display:inline-block;font-family:"Oswald",sans-serif;letter-spacing:.06em;
+    text-transform:uppercase;padding:2px 10px;border-radius:2px;font-size:14px;
+  }
+  .passtag.pass{background:var(--excellence);color:#fff}
+  .passtag.fail{background:var(--discrepancy);color:#fff}
+  .review{margin-top:8px}
+  .rev-item{border:1px solid var(--navy-line);border-radius:2px;padding:12px 14px;margin-top:8px;background:#0C1524}
+  .rev-mod{
+    font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;
+  }
+  .rev-q{font-size:14px;color:#EDF2F8;margin:0 0 8px;line-height:1.4;font-weight:500}
+  .rev-line{font-size:13px;line-height:1.5;margin:2px 0}
+  .rev-yours{color:#EDA298}
+  .rev-correct{color:#93D0A6}
+  .rev-why{color:#A9BACC;margin-top:6px;font-style:italic}
+
+  /* ── study guide viewer ── */
+  .guidesheet{
+    background:var(--paper);color:var(--ink);
+    border:2px solid var(--ink);border-radius:1px;
+    box-shadow:6px 6px 0 rgba(0,0,0,.35);padding:10px;
+  }
+  .guidesheet .inner{border:1px solid var(--ink);padding:24px 22px 34px}
+  .md{font-size:15px;line-height:1.62}
+  .md > *:first-child{margin-top:0}
+  .md h1,.md h2,.md h3,.md h4{
+    font-family:"Oswald",sans-serif;font-weight:500;letter-spacing:.03em;
+    line-height:1.25;scroll-margin-top:16px;
+  }
+  .md h1{
+    font-size:26px;text-transform:uppercase;margin:0 0 18px;
+    border-bottom:2px solid var(--ink);padding-bottom:8px;
+  }
+  .md h2{
+    font-size:20px;text-transform:uppercase;margin:34px 0 12px;
+    border-bottom:1px solid var(--paper-line);padding-bottom:6px;
+  }
+  .md h3{font-size:16px;margin:24px 0 8px;color:#3A3627}
+  .md h4{font-size:14px;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.08em}
+  .md p{margin:0 0 12px}
+  .md ul,.md ol{margin:0 0 12px;padding-left:22px}
+  .md li{margin:3px 0}
+  .md li > ul,.md li > ol{margin:3px 0 4px}
+  .md strong{font-weight:600}
+  .md a{color:#6B5416;text-decoration:none;border-bottom:1px solid #C4B98F}
+  .md a:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .md hr{border:none;border-top:1px solid var(--paper-line);margin:26px 0}
+  .md code{
+    font-family:"IBM Plex Mono",monospace;font-size:.88em;
+    background:#DDD6C3;padding:1px 4px;border-radius:2px;
+  }
+  .md blockquote{
+    margin:0 0 14px;padding:10px 14px;background:#DFD8C6;
+    border-left:3px solid var(--gold);
+  }
+  .md blockquote > *:last-child{margin-bottom:0}
+  .md .tblwrap{overflow-x:auto;margin:0 0 16px;-webkit-overflow-scrolling:touch}
+  .md table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.45}
+  .md th,.md td{border:1px solid var(--paper-line);padding:7px 9px;text-align:left;vertical-align:top}
+  .md th{background:#DAD3C0;font-family:"Oswald",sans-serif;font-weight:500;letter-spacing:.03em}
+  .md tbody tr:nth-child(even){background:#E3DCCA}
+  .guidetop{
+    position:sticky;bottom:14px;float:right;margin-top:18px;
+  }
+  @media (max-width:480px){
+    .guidesheet .inner{padding:16px 14px 26px}
+    .md{font-size:14.5px}
+    .md h1{font-size:22px}
+    .md h2{font-size:18px}
+  }
+  /* ── password gate ── */
+  #passwordGate{
+    position:fixed;inset:0;z-index:9999;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--navy-deep);padding:20px;
+  }
+  #passwordGate.hidden{display:none !important}
+  .password-card{
+    width:min(420px,100%);background:var(--navy);
+    border:1px solid var(--navy-line);border-top:3px solid var(--gold);
+    padding:28px 24px;box-shadow:8px 8px 0 rgba(0,0,0,.25);
+  }
+  .password-card h2{
+    font-family:"Oswald",sans-serif;font-weight:500;font-size:24px;
+    letter-spacing:.05em;text-transform:uppercase;margin:4px 0 8px;color:#F2F5F9;
+  }
+  .password-card p{margin:0 0 16px;color:#A9BACC;font-size:14px;line-height:1.5}
+  .password-card .hint{color:var(--gold);font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.04em;margin-bottom:18px}
+  #passwordInput{
+    width:100%;padding:12px;background:var(--navy-deep);border:1px solid var(--navy-line);
+    color:#F2F5F9;font:14px "IBM Plex Mono",monospace;border-radius:2px;
+  }
+  #passwordInput:focus{outline:2px solid var(--gold);outline-offset:1px}
+  #passwordSubmit{
+    width:100%;margin-top:10px;padding:12px;border:1px solid var(--gold);
+    background:var(--gold);color:var(--navy-deep);cursor:pointer;border-radius:2px;
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+  }
+  #passwordSubmit:hover{background:#D8B637}
+  #passwordError{color:#EDA298;font-size:12px;margin:10px 0 0;min-height:16px}
+  @media print{
+    body{background:#fff;color:#000}
+    .mast,.tabs,.drillbar,.foot,.guidetop{display:none !important}
+    #picker,#drill,#mcdrill,#summary,#testsetup,#testdrill,#testresult{display:none !important}
+    .wrap{max-width:none;padding:0}
+    .guidesheet{box-shadow:none;border:none;padding:0;background:#fff}
+    .guidesheet .inner{border:none;padding:0}
+    .md h2{page-break-after:avoid}
+    .md table,.md blockquote{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+  <section id="passwordGate" aria-label="Password required">
+    <div class="password-card">
+      <span class="label">Restricted Access</span>
+      <h2>OTS Trainer</h2>
+      <p>Enter the password to access the trainer.</p>
+      <p class="hint">Hint: Think Bird. Think Gold.</p>
+      <form id="passwordForm">
+        <input id="passwordInput" type="password" autocomplete="off" placeholder="Enter password" aria-label="Password">
+        <button id="passwordSubmit" type="submit">Enter</button>
+        <p id="passwordError" role="alert"></p>
+      </form>
+    </div>
+  </section>
+
+<div class="wrap">
+
+  <header class="mast">
+    <h1>OTS Trainer</h1>
+    <span class="label sub">OTS SPINS 1 Dec 2025 &middot; Academics</span>
+  </header>
+
+  <!-- DECK TABS -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-deck="spins">SPINS</button>
+    <button class="tab" data-deck="academics">Academic MC</button>
+    <button class="tab" data-deck="sob">Final Test Questions</button>
+    <button class="tab" data-deck="concepts">Concept Cards</button>
+    <button class="tab" data-deck="test">Practice Test</button>
+    <button class="tab" data-deck="guide">Study Guide</button>
+  </div>
+
+  <!-- PART / MODULE PICKER -->
+  <section id="picker">
+    <p class="picker-intro" id="pickerIntro"></p>
+    <div class="grid" id="tiles"></div>
+  </section>
+
+  <!-- FLASHCARD DRILL (SPINS) -->
+  <section id="drill" class="hidden">
+    <div class="drillbar">
+      <span class="title" id="drillTitle">Part 1</span>
+      <span class="label count" id="drillCount">1 / 32</span>
+      <button class="ghost" id="btnExit">Change part</button>
+    </div>
+
+    <article class="form341">
+      <div class="inner">
+        <div class="f-title" id="fFormTitle">Excellence / Discrepancy Report</div>
+        <div class="f-row stack">
+          <div class="f-cell" style="flex:2">
+            <span class="cap" id="fPartCap">Part — Subject</span>
+            <span class="val" id="fPart">1 — Identity &amp; Structure</span>
+          </div>
+          <div class="f-cell" style="flex:0 0 96px">
+            <span class="cap">Grade</span>
+            <span class="val">OT</span>
+          </div>
+        </div>
+        <div class="f-row">
+          <div class="f-cell" style="flex:2">
+            <span class="cap" id="fRefCap">Reference</span>
+            <span class="val" id="fRef">1.1</span>
+          </div>
+          <div class="f-cell" style="flex:1">
+            <span class="cap">Card</span>
+            <span class="val" id="fCard">1 of 32</span>
+          </div>
+        </div>
+        <div class="f-cell f-body" style="border-bottom:1px solid var(--ink)">
+          <span class="cap" id="fBodyCap">Excellence / Exhibited Discrepancy (be specific)</span>
+          <div class="qbox">
+            <p class="qtext" id="qText">—</p>
+            <div class="abox hidden" id="aBox">
+              <span class="alabel" id="fStdCap">Standard</span>
+              <p class="atext" id="aText"></p>
+            </div>
+            <p class="reveal-hint hidden" id="hint">Say it out loud, then check yourself. [Space]</p>
+          </div>
+        </div>
+        <div class="f-foot">
+          <span id="fFootSrc">OTS SPINS, 1 Dec 2025</span>
+          <span id="fTally">0 / 0</span>
+        </div>
+      </div>
+    </article>
+
+    <button class="revealbtn" id="btnReveal">Show the standard</button>
+    <div class="grade hidden" id="gradeRow">
+      <button class="ok" id="btnOk">Excellence<small>Had it — [1]</small></button>
+      <button class="no" id="btnNo">Discrepancy<small>Missed it — [2]</small></button>
+    </div>
+  </section>
+
+  <!-- MULTIPLE-CHOICE DRILL (ACADEMICS + Final Test Questions) -->
+  <section id="mcdrill" class="hidden">
+    <div class="drillbar">
+      <span class="title" id="mcTitle">Module</span>
+      <span class="label count" id="mcCount">1 / 12</span>
+      <button class="ghost" id="btnMcExit">Change module</button>
+    </div>
+
+    <article class="form341">
+      <div class="inner">
+        <div class="f-title" id="mcFormTitle">Academic Knowledge Check</div>
+        <div class="f-row stack">
+          <div class="f-cell" style="flex:2">
+            <span class="cap">Module</span>
+            <span class="val" id="mcModule">Core Values</span>
+          </div>
+          <div class="f-cell" style="flex:0 0 96px">
+            <span class="cap">Item</span>
+            <span class="val" id="mcItem">1 of 12</span>
+          </div>
+        </div>
+        <div class="f-row">
+          <div class="f-cell" style="flex:1">
+            <span class="cap">Sample of Behavior</span>
+            <span class="val wrap" id="mcSob">—</span>
+          </div>
+        </div>
+        <div class="f-cell f-body" style="border-bottom:1px solid var(--ink)">
+          <span class="cap">Select the correct response</span>
+          <div class="qbox">
+            <p class="qtext" id="mcQ">—</p>
+            <div class="opts" id="mcOpts"></div>
+            <div class="abox hidden" id="mcExpl">
+              <span class="alabel" id="mcExplLabel">Answer &amp; Rationale</span>
+              <p class="atext" id="mcExplText"></p>
+            </div>
+          </div>
+        </div>
+        <div class="f-foot">
+          <span id="mcFootSrc">OTS Academics</span>
+          <span id="mcTally">0 / 0</span>
+        </div>
+      </div>
+    </article>
+
+    <button class="revealbtn hidden" id="btnMcNext">Next item [Space]</button>
+  </section>
+
+  <!-- SUMMARY (shared) -->
+  <section id="summary" class="hidden">
+    <div class="summary">
+      <span class="label">Session complete</span>
+      <h2 id="sumTitle">Part 1</h2>
+      <div class="score" id="sumScore">0%</div>
+      <span class="label" id="sumLine">0 of 0</span>
+      <div id="sumMissWrap" class="hidden">
+        <p class="label" id="sumMissLabel" style="margin:22px 0 0">Re-drill these</p>
+        <ul id="sumMiss"></ul>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="btnRetryMissed">Drill the misses</button>
+        <button class="ghost" id="btnRestart">Run it again</button>
+        <button class="ghost" id="btnHome">Change part</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRACTICE TEST: SETUP -->
+  <section id="testsetup" class="hidden">
+    <div class="tsetup">
+      <span class="label">Practice test</span>
+      <h2>Build your exam</h2>
+      <p class="picker-intro" style="margin-top:8px">A timed multiple-choice exam drawn at random across every academic module, with the answer choices reshuffled on each draw. You answer every item first — no feedback along the way — then get your score, a module-by-module breakdown, and a full review of every miss.</p>
+
+      <span class="setup-label">Question bank</span>
+      <div class="seg" id="segBank"></div>
+
+      <span class="setup-label">Length</span>
+      <div class="seg" id="segLen"></div>
+
+      <span class="setup-label">Pass line</span>
+      <div class="seg" id="segPass"></div>
+
+      <p class="label" id="testSummaryLine" style="margin:16px 0 2px"></p>
+      <p class="label" id="testBest" style="margin:2px 0 0;color:var(--gold)"></p>
+
+      <button class="revealbtn" id="btnTestBegin" style="margin-top:20px">Begin practice test</button>
+      <p class="label" id="testPool" style="text-align:center;margin-top:10px"></p>
+    </div>
+  </section>
+
+  <!-- PRACTICE TEST: DRILL -->
+  <section id="testdrill" class="hidden">
+    <div class="drillbar">
+      <span class="title">Practice Test</span>
+      <span class="timer" id="tTimer">0:00</span>
+      <span class="label count" id="tCount">1 / 50</span>
+      <button class="ghost" id="btnTExit">End test</button>
+    </div>
+
+    <article class="form341">
+      <div class="inner">
+        <div class="f-title">Practice Examination</div>
+        <div class="f-row stack">
+          <div class="f-cell" style="flex:2">
+            <span class="cap">Module</span>
+            <span class="val" id="tModule">&mdash;</span>
+          </div>
+          <div class="f-cell" style="flex:0 0 110px">
+            <span class="cap">Item</span>
+            <span class="val" id="tItem">1 of 50</span>
+          </div>
+        </div>
+        <div class="f-cell f-body" style="border-bottom:1px solid var(--ink)">
+          <span class="cap">Select your response &mdash; no feedback until you finish</span>
+          <div class="qbox">
+            <p class="qtext" id="tQ">&mdash;</p>
+            <div class="opts" id="tOpts"></div>
+          </div>
+        </div>
+        <div class="f-foot">
+          <span id="tFootSrc">OTS Academics &mdash; Practice Exam</span>
+          <span id="tProgress">0 / 0 answered</span>
+        </div>
+      </div>
+    </article>
+
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="ghost" id="btnTPrev" style="flex:0 0 96px;padding:14px">&lsaquo; Prev</button>
+      <button class="revealbtn" id="btnTNext" style="margin-top:0;flex:1">Next [Space]</button>
+    </div>
+  </section>
+
+  <!-- PRACTICE TEST: RESULT -->
+  <section id="testresult" class="hidden">
+    <div class="summary">
+      <span class="label">Practice test complete</span>
+      <h2 style="display:flex;align-items:center;gap:10px">Results <span class="passtag" id="trTag">&mdash;</span></h2>
+      <div class="score" id="trScore">0%</div>
+      <span class="label" id="trLine">&mdash;</span>
+
+      <p class="label" style="margin:22px 0 0">Module breakdown</p>
+      <div class="breakdown" id="trBreakdown"></div>
+
+      <div id="trReviewWrap">
+        <p class="label" style="margin:22px 0 0">Review misses <span id="trReviewCount"></span></p>
+        <div class="review" id="trReview"></div>
+      </div>
+
+      <div class="actions">
+        <button class="ghost" id="btnTRetake">Retake (new draw)</button>
+        <button class="ghost" id="btnTNew">New test setup</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STUDY GUIDE VIEWER -->
+  <section id="guide" class="hidden">
+    <div class="drillbar">
+      <span class="title">Study Guide</span>
+      <span class="spacer"></span>
+      <button class="ghost" id="btnGuideTop">Contents</button>
+      <button class="ghost" id="btnGuideRefresh">Refresh</button>
+      <button class="ghost" id="btnGuidePrint">Print</button>
+    </div>
+
+    <article class="guidesheet">
+      <div class="inner">
+        <div class="md" id="guideBody"></div>
+      </div>
+    </article>
+
+    <button class="ghost guidetop" id="btnGuideTop2">&uarr; Top</button>
+  </section>
+
+  <footer class="foot">
+    <span class="label" id="keysLabel">Keys: space reveal &middot; 1 excellence &middot; 2 discrepancy</span>
+    <span class="label" id="totalLabel"></span>
+  </footer>
+
+</div>
+
+<script src="questions.js"></script>
+<script src="academic.js"></script>
+
+<!-- academic_shuffled.js declares the same two globals as academic.js, so stash the
+     originals, let the new file overwrite them, then hand each bank its own name.
+     Nothing inside either data file has to change. -->
+<script>window.__ACAD_V1 = { mods: window.ACADEMIC_MODULES, qs: window.ACADEMIC_QUESTIONS };</script>
+<script src="academic_shuffled.js"></script>
+<script>
+(function(){
+  var v1 = window.__ACAD_V1 || {};
+  /* If academic_shuffled.js failed to load, the globals still point at v1 — in that
+     case leave the Final Test Questions empty rather than cloning the original bank. */
+  var loaded = (window.ACADEMIC_QUESTIONS !== v1.qs);
+  window.SOB_MODULES   = loaded ? (window.ACADEMIC_MODULES   || []) : [];
+  window.SOB_QUESTIONS = loaded ? (window.ACADEMIC_QUESTIONS || []) : [];
+  window.ACADEMIC_MODULES   = v1.mods || [];
+  window.ACADEMIC_QUESTIONS = v1.qs   || [];
+})();
+</script>
+
+<script src="concepts.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---- password gate ---- */
+  var ACCESS_PASSWORD = "goldhawks";
+  var passwordGate = document.getElementById("passwordGate");
+  var passwordForm = document.getElementById("passwordForm");
+  var passwordInput = document.getElementById("passwordInput");
+  var passwordError = document.getElementById("passwordError");
+
+  function unlockTrainer(){
+    passwordGate.classList.add("hidden");
+    try { sessionStorage.setItem("ots-trainer-unlocked","1"); } catch(e){}
+  }
+
+  try {
+    if (sessionStorage.getItem("ots-trainer-unlocked") === "1") unlockTrainer();
+  } catch(e){}
+
+  passwordForm.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    if (passwordInput.value === ACCESS_PASSWORD){
+      unlockTrainer();
+      passwordInput.value = "";
+      passwordError.textContent = "";
+    } else {
+      passwordError.textContent = "Incorrect password. Try again, warrior.";
+      passwordInput.select();
+    }
+  });
+
+  /* ---- data ---- */
+  var SPINS      = window.SPINS_QUESTIONS || [];
+  var SPINS_PARTS= window.SPINS_PARTS || [];
+  var ACAD       = window.ACADEMIC_QUESTIONS || [];
+  var ACAD_MODS  = window.ACADEMIC_MODULES || [];
+  var SOB        = window.SOB_QUESTIONS || [];
+  var SOB_MODS   = window.SOB_MODULES || [];
+  var CONCEPTS     = window.CONCEPT_CARDS || [];
+  var CONCEPT_MODS = window.CONCEPT_MODULES || [];
+
+  /* Study guide is fetched at runtime so editing the markdown in the repo is
+     all it takes to update the site. Path is relative to this page, and the
+     filename is CASE-SENSITIVE once deployed — it must match the repo exactly. */
+  var GUIDE_URL = "StudyGuide.md";
+
+  var STORE_SPINS = "spins-trainer-v1";
+  var STORE_ACAD  = "academic-trainer-v1";
+  var STORE_SOB   = "sob-trainer-v1";
+  var STORE_CONCEPT = "concept-trainer-v1";
+
+  var el = function(id){ return document.getElementById(id); };
+
+  /* single state object; mode is "spins" | "mc" | "concept" | "test" */
+  var state = {
+    mode:"spins", deck:[], i:0, revealed:false, answered:false,
+    right:0, missed:[], groupNum:null, label:"", store:STORE_SPINS, source:"OTS Academics"
+  };
+  var activeDeck = "spins";
+
+  /* ---- progress (best % per group) ---- */
+  function loadProgress(store){
+    try { return JSON.parse(localStorage.getItem(store)) || {}; }
+    catch(e){ return {}; }
+  }
+  function saveProgress(store,p){
+    try { localStorage.setItem(store, JSON.stringify(p)); } catch(e){}
+  }
+  function recordScore(store,key,pct){
+    if (key === null || key === undefined) return;
+    var p = loadProgress(store);
+    var k = String(key);
+    if (!p[k] || pct > p[k]) p[k] = pct;
+    saveProgress(store,p);
+  }
+
+  /* ---- shuffle ---- */
+  function shuffle(a){
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  /* ---- answer-choice randomizer ----
+     Returns a COPY of the question with options reordered and .correct remapped.
+     Positional options ("all of the above", etc.) are left alone so they still make sense. */
+  var POSITIONAL = /\b(all|none|both|neither|any)\s+of\s+(the\s+)?(above|below|these)\b|\bboth\s+[a-d]\s+and\s+[a-d]\b|\ba\s+and\s+b\s+only\b/i;
+
+  function shuffledQuestion(q){
+    if (!q || !q.options || q.options.length < 2) return q;
+    for (var p = 0; p < q.options.length; p++){
+      if (POSITIONAL.test(String(q.options[p]))) return q;
+    }
+    var order = [];
+    for (var k = 0; k < q.options.length; k++) order.push(k);
+    shuffle(order);
+
+    var opts = [], correct = q.correct;
+    for (var j = 0; j < order.length; j++){
+      opts.push(q.options[order[j]]);
+      if (order[j] === q.correct) correct = j;
+    }
+    var copy = {};
+    for (var key in q){
+      if (Object.prototype.hasOwnProperty.call(q, key)) copy[key] = q[key];
+    }
+    copy.options = opts;
+    copy.correct = correct;
+    return copy;
+  }
+
+  /* ---- module list spanning both MC banks (same 20 titles, deduped) ---- */
+  function allModules(){
+    var seen = {}, out = [];
+    ACAD_MODS.concat(SOB_MODS).forEach(function(m){
+      if (!seen[m.title]){ seen[m.title] = 1; out.push(m); }
+    });
+    return out;
+  }
+
+  /* ---- tabs ---- */
+  function setDeck(deck){
+    stopTimer();
+    activeDeck = deck;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
+      t.classList.toggle("active", t.getAttribute("data-deck") === deck);
+    });
+    if (deck === "test"){ buildTestSetup(); show("testsetup"); }
+    else if (deck === "guide"){ buildGuide(); show("guide"); }
+    else { buildPicker(); show("picker"); }
+  }
+
+  /* ---- picker (deck-aware) ---- */
+  function buildPicker(){
+    var tiles = el("tiles");
+    tiles.innerHTML = "";
+
+    if (activeDeck === "spins"){
+      el("pickerIntro").textContent =
+        "Pick your assigned part. Every card is drawn straight from the SPINS with its paragraph number, so you can check yourself against the source.";
+      var progS = loadProgress(STORE_SPINS);
+      SPINS_PARTS.forEach(function(part){
+        var n = SPINS.filter(function(q){ return q.part === part.n; }).length;
+        var best = progS[String(part.n)];
+        tiles.appendChild(makeTile(
+          part.n < 10 ? "0" + part.n : String(part.n),
+          part.title, part.scope,
+          best !== undefined ? "best " + best + "%" : n + " cards",
+          best || 0,
+          function(){ startSpins(SPINS.filter(function(q){ return q.part === part.n; }),
+                                 "Part " + part.n + " — " + part.title, part.n); }
+        ));
+      });
+      tiles.appendChild(makeWideTile(
+        "ALL", "Full SPINS — every part shuffled", "Wing-wide drill", SPINS.length + " cards",
+        function(){ startSpins(SPINS.slice(), "Full SPINS", null); }
+      ));
+      el("totalLabel").textContent = SPINS.length + " SPINS cards";
+
+    } else if (activeDeck === "academics"){
+      el("pickerIntro").textContent =
+        "Pick a lesson. Each item shows the Sample of Behavior it maps to, the answer choices are reshuffled every time an item comes up, and after you answer you get the keyed answer with a short rationale.";
+      var progA = loadProgress(STORE_ACAD);
+      ACAD_MODS.forEach(function(mod){
+        var n = ACAD.filter(function(q){ return q.module === mod.title; }).length;
+        var best = progA[mod.title];
+        tiles.appendChild(makeTile(
+          mod.n < 10 ? "0" + mod.n : String(mod.n),
+          mod.title, mod.scope,
+          best !== undefined ? "best " + best + "%" : n + " questions",
+          best || 0,
+          function(){ startMc(ACAD.filter(function(q){ return q.module === mod.title; }),
+                              mod.title, mod.title, STORE_ACAD, "OTS Academics"); }
+        ));
+      });
+      tiles.appendChild(makeWideTile(
+        "ALL", "All academics — every module shuffled", "Full academic drill", ACAD.length + " questions",
+        function(){ startMc(ACAD.slice(), "All Academics", null, STORE_ACAD, "OTS Academics"); }
+      ));
+      el("totalLabel").textContent = ACAD.length + " academic questions";
+
+    } else if (activeDeck === "sob"){
+      el("pickerIntro").textContent =
+        "A second question bank built one SOB at a time from the Academic Assessment Study Guide — every Sample of Behavior in the guide is covered, mostly as scenarios, with at least two answer choices that sit right next to each other.";
+      if (!SOB.length){
+        tiles.appendChild(makeBankNote(
+          "Final Test Questions not loaded",
+          "Put <code>academic_shuffled.js</code> next to <code>index.html</code> in the repo and redeploy. " +
+          "The filename is case-sensitive once it is live."
+        ));
+        el("totalLabel").textContent = "Final Test Questions unavailable";
+        return;
+      }
+      var progB = loadProgress(STORE_SOB);
+      SOB_MODS.forEach(function(mod){
+        var n = SOB.filter(function(q){ return q.module === mod.title; }).length;
+        if (!n) return;
+        var best = progB[mod.title];
+        tiles.appendChild(makeTile(
+          mod.n < 10 ? "0" + mod.n : String(mod.n),
+          mod.title, mod.scope,
+          best !== undefined ? "best " + best + "%" : n + " questions",
+          best || 0,
+          function(){ startMc(SOB.filter(function(q){ return q.module === mod.title; }),
+                              mod.title, mod.title, STORE_SOB, "OTS Academics — Final Test Questions"); }
+        ));
+      });
+      tiles.appendChild(makeWideTile(
+        "ALL", "Whole Final Test Questions — every module shuffled", "Full SOB drill", SOB.length + " questions",
+        function(){ startMc(SOB.slice(), "All SOBs", null, STORE_SOB, "OTS Academics — Final Test Questions"); }
+      ));
+      el("totalLabel").textContent = SOB.length + " SOB questions";
+
+    } else {
+      el("pickerIntro").textContent =
+        "Pick a lesson to drill as flashcards — flip each card, say the concept out loud, then grade yourself. No multiple choice, just the concepts straight from the study guide.";
+      var progC = loadProgress(STORE_CONCEPT);
+      CONCEPT_MODS.forEach(function(mod){
+        var n = CONCEPTS.filter(function(c){ return c.module === mod.title; }).length;
+        var best = progC[mod.title];
+        tiles.appendChild(makeTile(
+          mod.n < 10 ? "0" + mod.n : String(mod.n),
+          mod.title, mod.scope,
+          best !== undefined ? "best " + best + "%" : n + " cards",
+          best || 0,
+          function(){ startConcepts(CONCEPTS.filter(function(c){ return c.module === mod.title; }),
+                                    mod.title, mod.title); }
+        ));
+      });
+      tiles.appendChild(makeWideTile(
+        "ALL", "All concepts — every module shuffled", "Full concept drill", CONCEPTS.length + " cards",
+        function(){ startConcepts(CONCEPTS.slice(), "All Concepts", null); }
+      ));
+      el("totalLabel").textContent = CONCEPTS.length + " concept cards";
+    }
+  }
+
+  function makeTile(num, name, scope, right, barPct, onClick){
+    var b = document.createElement("button");
+    b.className = "tile";
+    b.innerHTML =
+      '<span class="top"><span class="num">' + num + '</span>' +
+      '<span class="name">' + esc(name) + '</span></span>' +
+      '<span class="meta"><span class="label">' + esc(scope) + '</span>' +
+      '<span class="label">' + esc(right) + '</span></span>' +
+      '<span class="bar"><span style="width:' + barPct + '%"></span></span>';
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function makeWideTile(num, name, scope, right, onClick){
+    var b = document.createElement("button");
+    b.className = "tile wide";
+    b.innerHTML =
+      '<span class="top"><span class="num">' + num + '</span>' +
+      '<span class="name">' + esc(name) + '</span></span>' +
+      '<span class="meta"><span class="label">' + esc(scope) + '</span>' +
+      '<span class="label">' + esc(right) + '</span></span>';
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function makeBankNote(title, htmlBody){
+    var d = document.createElement("div");
+    d.className = "banknote";
+    d.innerHTML = '<span class="label">' + esc(title) + '</span><p>' + htmlBody + '</p>';
+    return d;
+  }
+  function esc(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  /* ---- view switch ---- */
+  function show(which){
+    ["picker","drill","mcdrill","summary","testsetup","testdrill","testresult","guide"].forEach(function(id){
+      el(id).classList.toggle("hidden", id !== which);
+    });
+    if (which === "drill")
+      el("keysLabel").textContent = "Keys: space reveal · 1 excellence · 2 discrepancy";
+    else if (which === "mcdrill")
+      el("keysLabel").textContent = "Keys: 1–4 choose · space / enter next";
+    else if (which === "testdrill")
+      el("keysLabel").textContent = "Keys: 1–4 choose · ← prev · space / → next";
+    else if (which === "guide")
+      el("keysLabel").textContent = "Study guide — tap a contents entry to jump to a section";
+    else
+      el("keysLabel").textContent = "Modes: SPINS · academic MC · Final Test Questions · concept cards · practice test · study guide";
+    window.scrollTo(0, 0);
+  }
+
+  /* ─────────────────────────  FLASHCARD MODE (SPINS + CONCEPTS)  ───────────────────────── */
+  function startFlash(deck, label, groupKey, store, mode){
+    state.mode = mode; state.store = store;
+    state.deck = shuffle(deck.slice());
+    state.i = 0; state.right = 0; state.missed = [];
+    state.label = label; state.groupNum = groupKey;
+    show("drill");
+    renderFlash();
+  }
+  function startSpins(deck, label, partNum){ startFlash(deck, label, partNum, STORE_SPINS, "spins"); }
+  function startConcepts(deck, label, modTitle){ startFlash(deck, label, modTitle, STORE_CONCEPT, "concept"); }
+
+  function renderFlash(){
+    var card = state.deck[state.i];
+    if (!card) return finish();
+    state.revealed = false;
+    var concept = (state.mode === "concept");
+
+    el("drillTitle").textContent = state.label;
+    el("drillCount").textContent = (state.i + 1) + " / " + state.deck.length;
+
+    el("fFormTitle").textContent = concept ? "Concept Card" : "Excellence / Discrepancy Report";
+    el("fPartCap").textContent   = concept ? "Module" : "Part — Subject";
+    el("fPart").textContent = concept
+      ? card.module
+      : (state.groupNum !== null
+          ? state.groupNum + " — " + ((SPINS_PARTS[state.groupNum - 1] || {}).title || "")
+          : "All parts");
+    el("fRefCap").textContent = concept ? "Topic" : "Reference";
+    el("fRef").textContent = card.ref || "—";
+    el("fCard").textContent = (state.i + 1) + " of " + state.deck.length;
+    el("fTally").textContent = state.right + " / " + state.i + (concept ? " recalled" : " held");
+    el("fBodyCap").textContent = concept
+      ? "Prompt — recall the concept, then check yourself"
+      : "Excellence / Exhibited Discrepancy (be specific)";
+    el("fStdCap").textContent = concept ? "Concept" : "Standard";
+    el("fFootSrc").textContent = concept ? "OTS Academics — Concepts" : "OTS SPINS, 1 Dec 2025";
+    el("btnReveal").textContent = concept ? "Show the concept" : "Show the standard";
+
+    el("qText").textContent = card.q;
+    el("aText").textContent = card.a;
+
+    el("aBox").classList.add("hidden");
+    el("hint").classList.remove("hidden");
+    el("gradeRow").classList.add("hidden");
+    el("btnReveal").classList.remove("hidden");
+  }
+  function reveal(){
+    if (state.revealed) return;
+    state.revealed = true;
+    el("aBox").classList.remove("hidden");
+    el("hint").classList.add("hidden");
+    el("btnReveal").classList.add("hidden");
+    el("gradeRow").classList.remove("hidden");
+    el("btnOk").focus();
+  }
+  function grade(good){
+    if (!state.revealed) return;
+    if (good) state.right++;
+    else state.missed.push(state.deck[state.i]);
+    state.i++;
+    renderFlash();
+  }
+
+  /* ─────────────────────────  MULTIPLE-CHOICE MODE (both banks)  ───────────────────────── */
+  var LETTERS = ["A","B","C","D","E","F"];
+
+  function startMc(deck, label, moduleTitle, store, source){
+    state.mode = "mc";
+    state.store = store || STORE_ACAD;
+    state.source = source || "OTS Academics";
+    state.deck = shuffle(deck.slice());
+    state.i = 0; state.right = 0; state.missed = [];
+    state.label = label; state.groupNum = moduleTitle;
+    show("mcdrill");
+    renderMc();
+  }
+  function renderMc(){
+    var q = state.deck[state.i];
+    if (!q) return finish();
+
+    /* fresh answer order every time an item is shown */
+    q = state.deck[state.i] = shuffledQuestion(q);
+    state.answered = false;
+
+    el("mcFormTitle").textContent =
+      (state.store === STORE_SOB) ? "SOB Knowledge Check" : "Academic Knowledge Check";
+    el("mcFootSrc").textContent = state.source;
+    el("mcTitle").textContent = state.label;
+    el("mcCount").textContent = (state.i + 1) + " / " + state.deck.length;
+    el("mcModule").textContent = q.module;
+    el("mcItem").textContent = (state.i + 1) + " of " + state.deck.length;
+    el("mcSob").textContent = q.sob || "—";
+    el("mcTally").textContent = state.right + " / " + state.i + " correct";
+    el("mcQ").textContent = q.q;
+
+    var wrap = el("mcOpts");
+    wrap.innerHTML = "";
+    q.options.forEach(function(opt, idx){
+      var b = document.createElement("button");
+      b.className = "opt";
+      b.setAttribute("data-idx", idx);
+      b.innerHTML = '<span class="lt">' + LETTERS[idx] + '</span><span>' + esc(opt) + '</span>';
+      b.addEventListener("click", function(){ answerMc(idx); });
+      wrap.appendChild(b);
+    });
+
+    el("mcExpl").classList.add("hidden");
+    el("btnMcNext").classList.add("hidden");
+  }
+  function answerMc(choice){
+    if (state.answered) return;
+    state.answered = true;
+    var q = state.deck[state.i];
+    var correct = q.correct;
+    var buttons = el("mcOpts").querySelectorAll(".opt");
+
+    Array.prototype.forEach.call(buttons, function(b){
+      var idx = parseInt(b.getAttribute("data-idx"), 10);
+      b.disabled = true;
+      if (idx === correct) b.classList.add("correct");
+      else if (idx === choice) b.classList.add("wrong");
+    });
+
+    if (choice === correct) state.right++;
+    else state.missed.push(q);
+
+    el("mcExplLabel").textContent =
+      (choice === correct ? "Correct — " : "Incorrect — ") + "Answer " + LETTERS[correct];
+    el("mcExplText").textContent = q.why || "";
+    el("mcExpl").classList.remove("hidden");
+    el("mcTally").textContent = state.right + " / " + (state.i + 1) + " correct";
+
+    var next = el("btnMcNext");
+    next.classList.remove("hidden");
+    next.focus();
+  }
+  function nextMc(){
+    if (!state.answered) return;
+    state.i++;
+    renderMc();
+  }
+
+  /* ─────────────────────────  SHARED SUMMARY  ───────────────────────── */
+  function finish(){
+    var total = state.deck.length;
+    var pct = total ? Math.round((state.right / total) * 100) : 0;
+    recordScore(state.store, state.groupNum, pct);
+
+    el("sumTitle").textContent = state.label;
+    el("sumScore").textContent = pct + "%";
+    el("sumLine").textContent =
+      (state.mode === "mc"      ? state.right + " of " + total + " correct on the first pass" :
+       state.mode === "concept" ? state.right + " of " + total + " recalled on the first pass" :
+                                  state.right + " of " + total + " held on the first pass");
+
+    var hasMiss = state.missed.length > 0;
+    el("sumMissWrap").classList.toggle("hidden", !hasMiss);
+    el("btnRetryMissed").classList.toggle("hidden", !hasMiss);
+
+    if (hasMiss){
+      var list, label;
+      if (state.mode === "mc"){
+        label = "Review these";
+        var seenQ = {}; list = [];
+        state.missed.forEach(function(m){
+          var stem = m.q.length > 78 ? m.q.slice(0, 78) + "…" : m.q;
+          var line = m.module + " — " + stem;
+          if (!seenQ[line]) { seenQ[line] = true; list.push(line); }
+        });
+      } else if (state.mode === "concept"){
+        label = "Concepts to review";
+        var seenC = {}; list = [];
+        state.missed.forEach(function(m){
+          var stem = m.q.length > 78 ? m.q.slice(0, 78) + "…" : m.q;
+          var line = m.module + " — " + stem;
+          if (!seenC[line]) { seenC[line] = true; list.push(line); }
+        });
+      } else {
+        label = "Paragraphs to re-drill";
+        var seenR = {}; list = [];
+        state.missed.forEach(function(m){
+          if (!seenR[m.ref]) { seenR[m.ref] = true; list.push(m.ref); }
+        });
+      }
+      el("sumMissLabel").textContent = label;
+      el("sumMiss").innerHTML = list.map(function(r){ return "<li>" + esc(r) + "</li>"; }).join("");
+    }
+    // relabel the "change" button per deck
+    el("btnHome").textContent = (state.mode === "mc" || state.mode === "concept") ? "Change module" : "Change part";
+    show("summary");
+  }
+
+  /* ─────────────────────────  PRACTICE TEST MODE  ───────────────────────── */
+  var STORE_TEST = "test-trainer-v1";
+  var testCfg = { len: 50, pass: 70, bank: "acad" };
+  var testTimer = null;
+
+  var BANKS = [
+    { id:"acad", short:"Academic", label:"Academic MC",  get:function(){ return ACAD; } },
+    { id:"sob",  short:"SOB",      label:"Final Test Questions",     get:function(){ return SOB;  } },
+    { id:"both", short:"Both",     label:"both banks",   get:function(){ return ACAD.concat(SOB); } }
+  ];
+  function bankDef(id){
+    for (var i = 0; i < BANKS.length; i++) if (BANKS[i].id === id) return BANKS[i];
+    return BANKS[0];
+  }
+  function testPoolArr(){ return bankDef(testCfg.bank).get(); }
+
+  function fmtTime(s){ var m = Math.floor(s/60), ss = s % 60; return m + ":" + (ss < 10 ? "0" : "") + ss; }
+  function startTimer(){
+    stopTimer();
+    el("tTimer").textContent = "0:00";
+    testTimer = setInterval(function(){
+      el("tTimer").textContent = fmtTime(Math.round((Date.now() - state.startTime) / 1000));
+    }, 500);
+  }
+  function stopTimer(){ if (testTimer){ clearInterval(testTimer); testTimer = null; } }
+
+  function buildTestSetup(){
+    /* fall back to whichever bank actually loaded */
+    if (!testPoolArr().length){
+      testCfg.bank = ACAD.length ? "acad" : (SOB.length ? "sob" : "acad");
+    }
+    var pool = testPoolArr().length;
+
+    var bankWrap = el("segBank"); bankWrap.innerHTML = "";
+    BANKS.forEach(function(bk){
+      var n = bk.get().length;
+      var b = document.createElement("button");
+      b.textContent = bk.short;
+      b.disabled = (n === 0);
+      b.title = n ? n + " questions" : "Not loaded";
+      if (testCfg.bank === bk.id) b.className = "sel";
+      b.addEventListener("click", function(){ testCfg.bank = bk.id; buildTestSetup(); });
+      bankWrap.appendChild(b);
+    });
+
+    var lens = [25, 50, 75, 100, 150].filter(function(n){ return n <= pool; });
+    if (!lens.length) lens = [pool];
+    if (lens.indexOf(testCfg.len) === -1) testCfg.len = lens[lens.length - 1];
+
+    var lenWrap = el("segLen"); lenWrap.innerHTML = "";
+    lens.forEach(function(n){
+      var b = document.createElement("button");
+      b.textContent = n;
+      if (testCfg.len === n) b.className = "sel";
+      b.addEventListener("click", function(){ testCfg.len = n; buildTestSetup(); });
+      lenWrap.appendChild(b);
+    });
+
+    var passWrap = el("segPass"); passWrap.innerHTML = "";
+    [70, 80, 90].forEach(function(p){
+      var b = document.createElement("button");
+      b.textContent = p + "%";
+      if (testCfg.pass === p) b.className = "sel";
+      b.addEventListener("click", function(){ testCfg.pass = p; buildTestSetup(); });
+      passWrap.appendChild(b);
+    });
+
+    var prog = loadProgress(STORE_TEST), key = testCfg.bank, parts = [];
+    if (prog[key + ":best"] !== undefined) parts.push("Best " + prog[key + ":best"] + "%");
+    if (prog[key + ":last"] !== undefined) parts.push("Last " + prog[key + ":last"] + "%");
+    el("testBest").textContent = parts.length
+      ? parts.join(" · ") + " on " + bankDef(key).label
+      : "No attempts yet on " + bankDef(key).label;
+
+    el("testPool").textContent = pool + " question pool";
+    el("totalLabel").textContent = pool + " questions in this pool";
+    el("testSummaryLine").textContent =
+      Math.min(testCfg.len, pool) + " questions · drawn from " + bankDef(testCfg.bank).label +
+      " across " + allModules().length + " modules · pass at " + testCfg.pass + "%";
+  }
+
+  function startTest(){
+    var pool = testPoolArr();
+    if (!pool.length) return;
+    var n = Math.min(testCfg.len, pool.length);
+    state.mode = "test";
+    state.testBank = testCfg.bank;
+    /* answer order is randomized once per draw, so it stays put while you page back and forth */
+    state.testDeck = shuffle(pool.slice()).slice(0, n).map(function(q){ return shuffledQuestion(q); });
+    state.testAns = [];
+    for (var k = 0; k < n; k++) state.testAns.push(null);
+    state.testI = 0;
+    state.passLine = testCfg.pass;
+    state.startTime = Date.now();
+    el("tFootSrc").textContent = "OTS Academics — " + bankDef(state.testBank).label;
+    startTimer();
+    show("testdrill");
+    renderTest();
+  }
+
+  function renderTest(){
+    var n = state.testDeck.length;
+    var q = state.testDeck[state.testI];
+    el("tCount").textContent = (state.testI + 1) + " / " + n;
+    el("tModule").textContent = q.module;
+    el("tItem").textContent = (state.testI + 1) + " of " + n;
+    el("tProgress").textContent =
+      state.testAns.filter(function(a){ return a !== null; }).length + " / " + n + " answered";
+    el("tQ").textContent = q.q;
+
+    var wrap = el("tOpts"); wrap.innerHTML = "";
+    q.options.forEach(function(opt, idx){
+      var b = document.createElement("button");
+      b.className = "opt" + (state.testAns[state.testI] === idx ? " sel" : "");
+      b.setAttribute("data-idx", idx);
+      b.innerHTML = '<span class="lt">' + LETTERS[idx] + '</span><span>' + esc(opt) + '</span>';
+      b.addEventListener("click", function(){ selectTest(idx); });
+      wrap.appendChild(b);
+    });
+    el("btnTPrev").disabled = state.testI === 0;
+    el("btnTNext").textContent = (state.testI === n - 1) ? "Finish test" : "Next [Space]";
+  }
+
+  function selectTest(idx){
+    state.testAns[state.testI] = idx;
+    var btns = el("tOpts").querySelectorAll(".opt");
+    Array.prototype.forEach.call(btns, function(b){
+      b.classList.toggle("sel", parseInt(b.getAttribute("data-idx"), 10) === idx);
+    });
+    var n = state.testDeck.length;
+    el("tProgress").textContent =
+      state.testAns.filter(function(a){ return a !== null; }).length + " / " + n + " answered";
+  }
+
+  function navTest(dir){
+    var n = state.testDeck.length;
+    if (dir > 0 && state.testI === n - 1) return finishTest();
+    state.testI = Math.max(0, Math.min(n - 1, state.testI + dir));
+    renderTest();
+    window.scrollTo(0, 0);
+  }
+
+  function finishTest(){
+    var unanswered = state.testAns.filter(function(a){ return a === null; }).length;
+    if (unanswered > 0){
+      if (!window.confirm(unanswered + " unanswered question(s) will be marked incorrect. Submit the test?")) return;
+    }
+    stopTimer();
+    var right = 0, perMod = {}, missed = [];
+    state.testDeck.forEach(function(q, i){
+      var chosen = state.testAns[i];
+      if (!perMod[q.module]) perMod[q.module] = { right: 0, total: 0 };
+      perMod[q.module].total++;
+      if (chosen === q.correct){ right++; perMod[q.module].right++; }
+      else missed.push({ q: q, chosen: chosen });
+    });
+    var total = state.testDeck.length;
+    var pct = Math.round(right / total * 100);
+    var secs = Math.round((Date.now() - state.startTime) / 1000);
+
+    var prog = loadProgress(STORE_TEST), key = state.testBank || "acad";
+    prog[key + ":last"] = pct;
+    if (prog[key + ":best"] === undefined || pct > prog[key + ":best"]) prog[key + ":best"] = pct;
+    saveProgress(STORE_TEST, prog);
+
+    state.testResult = { right: right, total: total, pct: pct, passed: pct >= state.passLine,
+                         secs: secs, perMod: perMod, missed: missed };
+    renderTestResult();
+  }
+
+  function renderTestResult(){
+    var r = state.testResult;
+    el("trScore").textContent = r.pct + "%";
+    var tag = el("trTag");
+    tag.textContent = r.passed ? "Pass" : "Below line";
+    tag.className = "passtag " + (r.passed ? "pass" : "fail");
+    el("trLine").textContent =
+      r.right + " of " + r.total + " correct · " + bankDef(state.testBank).label +
+      " · pass line " + state.passLine + "% · time " + fmtTime(r.secs);
+
+    var bd = el("trBreakdown"); bd.innerHTML = "";
+    allModules().forEach(function(mod){
+      var m = r.perMod[mod.title];
+      if (!m) return;
+      var p = Math.round(m.right / m.total * 100);
+      var row = document.createElement("div");
+      row.className = "brow";
+      row.innerHTML = '<span class="bmod">' + esc(mod.title) + '</span>' +
+                      '<span class="bpct">' + m.right + "/" + m.total + " · " + p + '%</span>';
+      bd.appendChild(row);
+    });
+
+    var rev = el("trReview"); rev.innerHTML = "";
+    el("trReviewCount").textContent = "(" + r.missed.length + ")";
+    if (r.missed.length === 0){
+      rev.innerHTML = '<p class="rev-line rev-correct">Clean sweep — no misses to review.</p>';
+    } else {
+      r.missed.forEach(function(m){
+        var q = m.q;
+        var your = (m.chosen === null) ? "— (left blank)" : LETTERS[m.chosen] + ". " + q.options[m.chosen];
+        var corr = LETTERS[q.correct] + ". " + q.options[q.correct];
+        var item = document.createElement("div");
+        item.className = "rev-item";
+        item.innerHTML =
+          '<span class="rev-mod">' + esc(q.module) + '</span>' +
+          '<p class="rev-q">' + esc(q.q) + '</p>' +
+          '<p class="rev-line rev-yours">Your answer: ' + esc(your) + '</p>' +
+          '<p class="rev-line rev-correct">Correct: ' + esc(corr) + '</p>' +
+          (q.why ? '<p class="rev-line rev-why">' + esc(q.why) + '</p>' : '');
+        rev.appendChild(item);
+      });
+    }
+    show("testresult");
+  }
+
+  /* ─────────────────────────  STUDY GUIDE VIEWER  ─────────────────────────
+     Small markdown renderer: headings (with GitHub-style anchor ids so the
+     document's own Contents links work), lists incl. nesting, tables,
+     blockquotes, rules, bold/italic/code/links. */
+  var guideState = "idle";   /* idle | loading | done | error */
+  var slugSeen = {};
+
+  function slugify(s){
+    var base = String(s).toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s/g, "-");
+    if (slugSeen[base] === undefined){ slugSeen[base] = 0; return base; }
+    slugSeen[base]++;
+    return base + "-" + slugSeen[base];
+  }
+
+  function mdInline(s){
+    var t = esc(s);
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    return t;
+  }
+
+  function listMatch(line){
+    if (typeof line !== "string") return null;
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) return null;
+    var m = line.match(/^(\s*)([-*+]|(\d+)[.)])\s+(.*)$/);
+    if (!m) return null;
+    return { indent: m[1].length, ordered: !!m[3],
+             num: m[3] ? parseInt(m[3], 10) : null, text: m[4] };
+  }
+
+  function buildList(items, i, indent){
+    var ordered = items[i].ordered;
+    var startNum = items[i].num;
+    var html = ordered
+      ? "<ol" + (startNum && startNum !== 1 ? ' start="' + startNum + '"' : "") + ">"
+      : "<ul>";
+    while (i < items.length && items[i].indent >= indent){
+      if (items[i].indent > indent) break;
+      var li = "<li>" + mdInline(items[i].text);
+      i++;
+      if (i < items.length && items[i].indent > indent){
+        var sub = buildList(items, i, items[i].indent);
+        li += sub.html;
+        i = sub.i;
+      }
+      li += "</li>";
+      html += li;
+    }
+    html += ordered ? "</ol>" : "</ul>";
+    return { html: html, i: i };
+  }
+
+  function splitRow(line){
+    var s = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    return s.split("|").map(function(c){ return c.trim(); });
+  }
+
+  function mdBlocks(lines){
+    var out = [], i = 0;
+    while (i < lines.length){
+      var line = lines[i];
+      if (!line || !line.trim()){ i++; continue; }
+
+      /* horizontal rule */
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){ out.push("<hr>"); i++; continue; }
+
+      /* heading */
+      var h = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+      if (h){
+        var lvl = h[1].length;
+        var txt = h[2].replace(/\s+#+\s*$/, "");
+        out.push("<h" + lvl + ' id="' + slugify(txt) + '">' + mdInline(txt) + "</h" + lvl + ">");
+        i++; continue;
+      }
+
+      /* blockquote */
+      if (/^\s*>/.test(line)){
+        var q = [];
+        while (i < lines.length && /^\s*>/.test(lines[i])){
+          q.push(lines[i].replace(/^\s*>\s?/, ""));
+          i++;
+        }
+        out.push("<blockquote>" + mdBlocks(q) + "</blockquote>");
+        continue;
+      }
+
+      /* table */
+      if (/^\s*\|/.test(line) && i + 1 < lines.length &&
+          /^\s*\|[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].indexOf("-") > -1){
+        var head = splitRow(lines[i]);
+        i += 2;
+        var body = [];
+        while (i < lines.length && /^\s*\|/.test(lines[i])){ body.push(splitRow(lines[i])); i++; }
+        var t = '<div class="tblwrap"><table><thead><tr>';
+        head.forEach(function(c){ t += "<th>" + mdInline(c) + "</th>"; });
+        t += "</tr></thead><tbody>";
+        body.forEach(function(row){
+          t += "<tr>";
+          row.forEach(function(c){ t += "<td>" + mdInline(c) + "</td>"; });
+          t += "</tr>";
+        });
+        out.push(t + "</tbody></table></div>");
+        continue;
+      }
+
+      /* list */
+      if (listMatch(line)){
+        var items = [];
+        while (i < lines.length){
+          var lm = listMatch(lines[i]);
+          if (lm){ items.push(lm); i++; continue; }
+          if (!lines[i].trim() && i + 1 < lines.length && listMatch(lines[i + 1])){ i++; continue; }
+          if (lines[i].trim() && items.length && /^\s{2,}\S/.test(lines[i]) &&
+              !/^\s*[|#>]/.test(lines[i])){
+            items[items.length - 1].text += " " + lines[i].trim();
+            i++; continue;
+          }
+          break;
+        }
+        out.push(buildList(items, 0, items[0].indent).html);
+        continue;
+      }
+
+      /* paragraph */
+      var p = [];
+      while (i < lines.length && lines[i].trim() &&
+             !/^\s*#{1,6}\s/.test(lines[i]) && !/^\s*>/.test(lines[i]) &&
+             !/^\s*\|/.test(lines[i]) && !listMatch(lines[i]) &&
+             !/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i])){
+        p.push(lines[i].trim()); i++;
+      }
+      if (p.length) out.push("<p>" + mdInline(p.join(" ")) + "</p>");
+      else i++;
+    }
+    return out.join("\n");
+  }
+
+  function mdToHtml(md){
+    slugSeen = {};
+    return mdBlocks(String(md).replace(/\r\n?/g, "\n").split("\n"));
+  }
+
+  function guideError(detail){
+    return '<p><strong>Could not load ' + esc(GUIDE_URL) + '.</strong> ' + esc(detail) + '</p>' +
+      "<p>On the live site, check that the file is committed to the repo and deployed " +
+      "alongside <code>index.html</code>.</p>" +
+      "<p>Opening this file straight off your hard drive (a <code>file://</code> address) will " +
+      "always fail here — browsers block reading local files. Serve the folder instead: " +
+      "<code>python3 -m http.server</code>, then visit " +
+      "<code>http://localhost:8000</code>.</p>";
+  }
+
+  function buildGuide(){
+    el("totalLabel").textContent = "Study guide";
+    if (guideState === "loading" || guideState === "done") return;
+
+    var body = el("guideBody");
+    guideState = "loading";
+    body.innerHTML = "<p>Loading the study guide…</p>";
+
+    if (!window.fetch){
+      guideState = "error";
+      body.innerHTML = guideError("This browser does not support fetch.");
+      return;
+    }
+
+    /* no-cache revalidates with the server, so a fresh deploy shows up on reload */
+    window.fetch(GUIDE_URL, { cache: "no-cache" })
+      .then(function(res){
+        if (!res.ok) throw new Error("Server responded " + res.status + " " + res.statusText + ".");
+        return res.text();
+      })
+      .then(function(md){
+        if (!md || !md.trim()) throw new Error("The file is empty.");
+        body.innerHTML = mdToHtml(md);
+        guideState = "done";
+      })
+      .catch(function(err){
+        guideState = "error";
+        body.innerHTML = guideError(err && err.message ? err.message : String(err));
+      });
+  }
+
+  function refreshGuide(){
+    guideState = "idle";
+    buildGuide();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---- wiring ---- */
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
+    t.addEventListener("click", function(){ setDeck(t.getAttribute("data-deck")); });
+  });
+
+  el("btnReveal").addEventListener("click", reveal);
+  el("btnOk").addEventListener("click", function(){ grade(true); });
+  el("btnNo").addEventListener("click", function(){ grade(false); });
+  el("btnExit").addEventListener("click", function(){ buildPicker(); show("picker"); });
+
+  el("btnMcNext").addEventListener("click", nextMc);
+  el("btnMcExit").addEventListener("click", function(){ buildPicker(); show("picker"); });
+
+  el("btnHome").addEventListener("click", function(){ buildPicker(); show("picker"); });
+  el("btnRestart").addEventListener("click", function(){
+    if (state.mode === "mc") startMc(state.deck, state.label, state.groupNum, state.store, state.source);
+    else if (state.mode === "concept") startConcepts(state.deck, state.label, state.groupNum);
+    else startSpins(state.deck, state.label, state.groupNum);
+  });
+  el("btnRetryMissed").addEventListener("click", function(){
+    if (state.mode === "mc") startMc(state.missed, state.label + " — misses", null, state.store, state.source);
+    else if (state.mode === "concept") startConcepts(state.missed, state.label + " — misses", null);
+    else startSpins(state.missed, state.label + " — misses", null);
+  });
+
+  el("btnTestBegin").addEventListener("click", startTest);
+  el("btnTPrev").addEventListener("click", function(){ navTest(-1); });
+  el("btnTNext").addEventListener("click", function(){ navTest(1); });
+  el("btnTExit").addEventListener("click", function(){
+    if (!window.confirm("End the test and discard this attempt?")) return;
+    stopTimer(); buildTestSetup(); show("testsetup");
+  });
+  el("btnTRetake").addEventListener("click", startTest);
+  el("btnTNew").addEventListener("click", function(){ buildTestSetup(); show("testsetup"); });
+
+  el("btnGuideTop").addEventListener("click", function(){ window.scrollTo(0, 0); });
+  el("btnGuideTop2").addEventListener("click", function(){ window.scrollTo(0, 0); });
+  el("btnGuideRefresh").addEventListener("click", refreshGuide);
+  el("btnGuidePrint").addEventListener("click", function(){ window.print(); });
+
+  document.addEventListener("keydown", function(e){
+    if (e.target.tagName === "INPUT") return;
+
+    // SPINS flashcards
+    if (!el("drill").classList.contains("hidden")){
+      if (e.code === "Space" || e.key === "Enter"){
+        if (!state.revealed){ e.preventDefault(); reveal(); }
+      } else if (e.key === "1"){ grade(true); }
+        else if (e.key === "2"){ grade(false); }
+      return;
+    }
+
+    // Multiple choice (Academic MC + Final Test Questions)
+    if (!el("mcdrill").classList.contains("hidden")){
+      if (!state.answered){
+        if (e.key >= "1" && e.key <= "4"){
+          var idx = parseInt(e.key, 10) - 1;
+          var q = state.deck[state.i];
+          if (q && idx < q.options.length){ e.preventDefault(); answerMc(idx); }
+        }
+      } else {
+        if (e.code === "Space" || e.key === "Enter"){ e.preventDefault(); nextMc(); }
+      }
+      return;
+    }
+
+    // Practice test
+    if (!el("testdrill").classList.contains("hidden")){
+      if (e.key >= "1" && e.key <= "4"){
+        var tq = state.testDeck[state.testI];
+        var ti = parseInt(e.key, 10) - 1;
+        if (tq && ti < tq.options.length){ e.preventDefault(); selectTest(ti); }
+      } else if (e.code === "Space" || e.key === "Enter" || e.key === "ArrowRight"){
+        e.preventDefault(); navTest(1);
+      } else if (e.key === "ArrowLeft"){
+        e.preventDefault(); navTest(-1);
+      }
+    }
+  });
+
+  buildPicker();
+})();
+</script>
+</body>
+</html>
+

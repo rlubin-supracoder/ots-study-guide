@@ -1,0 +1,7 @@
+dist/
+.reference/
+.local/
+node_modules/
+reference.html
+*.log
+
