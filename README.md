@@ -1,8 +1,8 @@
 # OTS Trainer
 
-A faithful static copy of [OTS Trainer](https://otstrainer.vercel.app/), captured September 6, 2026, configured for GitHub Pages. The original HTML, CSS, JavaScript, question banks, and study guide are preserved.
+A static copy of [OTS Trainer](https://otstrainer.vercel.app/), captured September 6, 2026, configured for GitHub Pages. The original study interface, question banks, and study guide are preserved, with red accents and a custom Wolfpack access screen.
 
-Includes SPINS flashcards, Academic MC, Final Test Questions, Concept Cards, Practice Test, and Study Guide. The original password screen, keyboard shortcuts, answer shuffling, timed tests, scoring, printing, and browser-local progress are retained.
+Includes SPINS flashcards, Academic MC, Final Test Questions, Concept Cards, Practice Test, and Study Guide. Keyboard shortcuts, answer shuffling, timed tests, scoring, printing, and browser-local progress are retained. The access hint is "AWOOOOOOO + Class"; password matching is case-sensitive. Previously unlocked sessions must enter the updated password after reloading.
 
 ## Run locally
 
@@ -29,7 +29,7 @@ All local script and study guide links are relative, so the site works under a p
 
 ## Files and original behavior
 
-- `index.html`: original interface, styles, and application logic.
+- `index.html`: interface, red accent styles, custom access screen, and application logic.
 - `questions.js`: SPINS cards.
 - `academic.js`: Academic MC bank.
 - `academic_shuffled.js`: independent Final Test Questions bank.
