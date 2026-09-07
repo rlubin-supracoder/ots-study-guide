@@ -6,7 +6,7 @@ import { siteFiles } from './site-files.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = Number(process.env.PORT || 8000);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.md': 'text/markdown' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.md': 'text/markdown', '.pdf': 'application/pdf' };
 const server = createServer(async (req, res) => {
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
@@ -17,7 +17,8 @@ const server = createServer(async (req, res) => {
       res.writeHead(404); res.end('Not found'); return;
     }
     const content = await readFile(resolve(root, name));
-    res.writeHead(200, { 'Content-Type': `${types[extname(name)] || 'text/plain'}; charset=utf-8` });
+    const type = types[extname(name)] || 'text/plain';
+    res.writeHead(200, { 'Content-Type': type === 'application/pdf' ? type : `${type}; charset=utf-8` });
     res.end(content);
   } catch {
     res.writeHead(500); res.end('Unable to load site file');

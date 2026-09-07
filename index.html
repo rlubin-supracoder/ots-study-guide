@@ -40,7 +40,7 @@
 
   /* ── masthead ── */
   header.mast{
-    display:flex;align-items:baseline;gap:12px;
+    display:flex;align-items:flex-end;gap:12px;
     border-bottom:1px solid var(--navy-line);
     padding-bottom:12px;margin-bottom:18px;flex-wrap:wrap;
   }
@@ -49,7 +49,19 @@
     font-size:clamp(20px,5vw,28px);letter-spacing:.04em;
     text-transform:uppercase;margin:0;color:#F2F5F9;
   }
-  header.mast .sub{margin-left:auto}
+  header.mast .mast-info{
+    display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:auto;
+  }
+  .syllabus-link{
+    display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+    padding:8px 16px;border:1px solid var(--accent);border-radius:2px;
+    background:var(--navy-deep);color:var(--accent);text-decoration:none;
+    font-family:"Oswald",sans-serif;font-size:14px;letter-spacing:.08em;
+    text-transform:uppercase;transition:background .12s,color .12s;
+  }
+  .syllabus-link:hover,.syllabus-link:focus-visible{
+    background:var(--accent);color:var(--navy-deep);
+  }
 
   /* ── deck tabs ── */
   .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
@@ -395,7 +407,10 @@
 
   <header class="mast">
     <h1>OTS Trainer</h1>
-    <span class="label sub">OTS SPINS 1 Dec 2025 &middot; Academics</span>
+    <div class="mast-info">
+      <a class="syllabus-link" href="AY26_OTS_Syllabus_13-Nov-2025.pdf" target="_blank" rel="noopener noreferrer" aria-label="Syllabus (PDF, opens in a new tab)">SYLLABUS</a>
+      <span class="label sub">OTS SPINS 1 Dec 2025 &middot; Academics</span>
+    </div>
   </header>
 
   <!-- DECK TABS -->
