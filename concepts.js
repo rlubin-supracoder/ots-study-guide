@@ -365,3 +365,4 @@ window.CONCEPT_CARDS = [
   { module:`Military Justice`, ref:`ADC`, q:`Function of the Area Defense Counsel (ADC).`, a:`Represents Air Force and Space Force personnel accused of wrongdoing, of ALL ranks. Operates through a separate chain of command to ensure independence. Provides advice and representation for criminal investigations, LORs, Article 15s, administrative actions, and courts-martial.` },
   { module:`Military Justice`, ref:`VC`, q:`Function of the Victims' Counsel (VC).`, a:`Advises and represents victims of alleged sexual assault and domestic violence; assists victims with their rights and can represent them in certain matters during courts-martial; and operates through a separate chain of command from the SJA.` },
 ];
+

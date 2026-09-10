@@ -564,3 +564,4 @@ window.SPINS_QUESTIONS = [
 { part:16, ref:`A3.7.4`, q:`How do OTs depart the DFAC during lightning storms?`, a:`Exit on the side closest to Welch Field and proceed directly to Gilbert Hall, in single file, expeditiously, to gain accountability of the flight — or as otherwise dictated by OTS staff or the OT chain of command.` },
 { part:16, ref:`A3.7.4`, q:`What must OTs NOT do when departing the DFAC during lightning within five?`, a:`Do not collect guidon staffs.` },
 ];
+

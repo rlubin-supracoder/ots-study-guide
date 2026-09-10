@@ -57,3 +57,4 @@ assert(html.includes('var GUIDE_URL = "StudyGuide.md"'), 'Study guide must use a
 assert(read('StudyGuide.md').trim().length > 1000, 'Study guide is incomplete');
 assert(!/\b(?:src|href)="\/(?!\/)/i.test(html), 'Root-relative assets break project Pages paths');
 console.log(`Checked ${total} study items, script syntax and order, study guide, and GitHub Pages asset paths.`);
+

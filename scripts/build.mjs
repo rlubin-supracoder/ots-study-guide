@@ -9,3 +9,4 @@ const output = resolve(root, 'dist');
 mkdirSync(output, { recursive: true });
 for (const name of siteFiles) copyFileSync(resolve(root, name), resolve(output, name));
 console.log(`Static site ready in dist/ (${siteFiles.length} files).`);
+

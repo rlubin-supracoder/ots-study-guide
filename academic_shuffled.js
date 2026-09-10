@@ -355,3 +355,4 @@ window.ACADEMIC_QUESTIONS = [
 { module:`Military Planning`, sob:`Recall the purpose of wargaming.`, q:`Beyond improving the plan, what secondary benefit does the guide attribute to wargaming?`, options:[`It builds trust between the commander and the planning team`, `It fosters critical thinking in new officers`, `It shortens the planning timeline in future cycles`, `It satisfies the documentation requirement for the plan`], correct:1, why:`The guide specifically notes that wargaming fosters critical thinking in new officers, which is why it is valuable even when the plan itself is straightforward.` },
 
 ];
+

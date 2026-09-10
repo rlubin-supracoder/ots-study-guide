@@ -1114,3 +1114,4 @@ Wargames provide a **structured environment** to:
 **Discipline options (3):** Administrative tools · Nonjudicial punishment (Art 15) · Judicial actions (courts-martial)
 **Courts-martial (3):** Summary (minor, enlisted only) · Special (intermediate) · General (most serious)
 **Objectives of administrative action (3):** Reform the offender · Deter others · Maintain consistent group standards
+
