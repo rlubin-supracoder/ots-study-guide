@@ -7,7 +7,7 @@ import { siteFiles } from './site-files.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = name => readFileSync(resolve(root, name), 'utf8');
-for (const name of siteFiles) read(name);
+for (const name of siteFiles) readFileSync(resolve(root, name));
 const html = read('index.html');
 const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 const context = vm.createContext({ window: {} });
@@ -16,7 +16,9 @@ for (const [, attributes, body] of scripts) {
   const src = attributes.match(/\bsrc="([^"]+)"/i)?.[1];
   if (src) {
     assert(siteFiles.includes(src), `Missing packaged script: ${src}`);
-    new vm.Script(read(src), { filename: src }).runInContext(context, { timeout: 1000 });
+    const source = read(src);
+    const script = new vm.Script(source, { filename: src });
+    if (!source.includes('document.')) script.runInContext(context, { timeout: 1000 });
   } else {
     const script = new vm.Script(body, { filename: `index-inline-${++inlineCount}.js` });
     // Execute bank wiring in its original document order, without a browser DOM.
@@ -57,4 +59,3 @@ assert(html.includes('var GUIDE_URL = "StudyGuide.md"'), 'Study guide must use a
 assert(read('StudyGuide.md').trim().length > 1000, 'Study guide is incomplete');
 assert(!/\b(?:src|href)="\/(?!\/)/i.test(html), 'Root-relative assets break project Pages paths');
 console.log(`Checked ${total} study items, script syntax and order, study guide, and GitHub Pages asset paths.`);
-

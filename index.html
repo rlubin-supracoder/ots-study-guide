@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OTS Trainer — SPINS + Academics</title>
+<link rel="stylesheet" href="secret-game-launcher.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -392,7 +393,13 @@
   <section id="passwordGate" aria-label="Password required">
     <div class="password-card">
       <span class="label">Restricted Access</span>
-      <h2>OTS Trainer</h2>
+      <div class="trainer-brand">
+        <h2>OTS Trainer</h2>
+        <span class="delta-mark">
+          <img src="ussf_delta.png" alt="U.S. Space Force delta" width="997" height="1477">
+          <button class="delta-star" type="button" aria-label="Open Orbit Hop" aria-haspopup="dialog"></button>
+        </span>
+      </div>
       <p>Enter the password to access the trainer.</p>
       <p class="hint">Hint: AWOOOOOOO + Class</p>
       <form id="passwordForm">
@@ -406,7 +413,13 @@
 <div class="wrap">
 
   <header class="mast">
-    <h1>OTS Trainer</h1>
+    <div class="trainer-brand">
+      <h1>OTS Trainer</h1>
+      <span class="delta-mark">
+        <img src="ussf_delta.png" alt="U.S. Space Force delta" width="997" height="1477">
+        <button class="delta-star" type="button" aria-label="Open Orbit Hop" aria-haspopup="dialog"></button>
+      </span>
+    </div>
     <div class="mast-info">
       <a class="syllabus-link" href="AY26_OTS_Syllabus_13-Nov-2025.pdf" target="_blank" rel="noopener noreferrer" aria-label="Syllabus (PDF, opens in a new tab)">SYLLABUS</a>
       <span class="label sub">OTS SPINS 1 Dec 2025 &middot; Academics</span>
@@ -1663,6 +1676,14 @@
   buildPicker();
 })();
 </script>
+<dialog id="secretGameDialog" class="secret-game-dialog" aria-labelledby="secretGameTitle">
+  <div class="secret-game-toolbar">
+    <span id="secretGameTitle">ORBIT HOP</span>
+    <button id="closeSecretGame" type="button" aria-label="Close game and return to trainer">Return to trainer &times;</button>
+  </div>
+  <iframe id="secretGameFrame" title="Orbit Hop space jumping game" src="about:blank"></iframe>
+</dialog>
+<script src="secret-game-launcher.js" defer></script>
 </body>
 </html>
 

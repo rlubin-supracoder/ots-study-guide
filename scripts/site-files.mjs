@@ -7,4 +7,13 @@ export const siteFiles = [
   'StudyGuide.md',
   'AY26_OTS_Syllabus_13-Nov-2025.pdf',
   '.nojekyll',
+  'ussf_delta.png',
+  'secret-game-launcher.css',
+  'secret-game-launcher.js',
+  'secret-game.html',
+  'space-jump.css',
+  'space-jump.js',
+  'space-jump-engine.mjs',
+  'astronaut.png',
+  'space-background.png',
 ];
