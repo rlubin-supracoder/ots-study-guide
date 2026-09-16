@@ -16,4 +16,10 @@ export const siteFiles = [
   'space-jump-engine.mjs',
   'astronaut.png',
   'space-background.png',
+  'turtle-crusher.html',
+  'turtle-crusher.css',
+  'turtle-crusher.js',
+  'turtle-crusher-engine.mjs',
+  'turtle.png',
+  'apple.png',
 ];

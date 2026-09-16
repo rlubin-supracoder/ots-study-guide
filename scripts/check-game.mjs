@@ -42,7 +42,7 @@ assert.equal(scrolling.score, highScore, 'Falling must not subtract score');
 scrolling.reset();
 assert(!scrolling.over && scrolling.score === 0 && scrolling.camera === 0, 'Restart resets run state');
 
-for (const file of ['index.html', 'secret-game.html', 'secret-game-launcher.css', 'space-jump.css']) {
+for (const file of ['index.html', 'secret-game.html', 'turtle-crusher.html', 'secret-game-launcher.css', 'space-jump.css', 'turtle-crusher.css']) {
   const raw = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
   const source = file.endsWith('.html') ? raw.replace(/(<script\b[^>]*>)[\s\S]*?(<\/script>)/g, '$1$2') : raw;
   const paths = [...source.matchAll(/(?:src|href)="([^"]+)"|url\("([^\"]+)"\)/g)].map(match => match[1] || match[2]);

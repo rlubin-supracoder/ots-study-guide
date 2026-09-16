@@ -724,7 +724,11 @@
 
   passwordForm.addEventListener("submit", function(ev){
     ev.preventDefault();
-    if (passwordInput.value === ACCESS_PASSWORD){
+    if (passwordInput.value.trim().toLowerCase() === "turtles"){
+      passwordInput.value = "";
+      passwordError.textContent = "";
+      document.dispatchEvent(new CustomEvent("turtle-crusher:open"));
+    } else if (passwordInput.value === ACCESS_PASSWORD){
       unlockTrainer();
       passwordInput.value = "";
       passwordError.textContent = "";

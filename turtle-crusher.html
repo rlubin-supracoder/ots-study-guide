@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Turtle Crusher</title>
+  <link rel="stylesheet" href="turtle-crusher.css">
+</head>
+<body>
+  <main id="game" hidden>
+    <header class="game-heading">
+      <p class="eyebrow">THE SECRET ORCHARD</p>
+      <h1>Turtle <span>Crusher</span></h1>
+      <p class="tagline">Little turtles. Big apple energy.</p>
+    </header>
+    <div class="scoreboard" aria-label="Round statistics">
+      <div><span>SCORE</span><strong id="score">0</strong></div>
+      <div class="clock"><span>TIME LEFT</span><strong><b id="time">30</b><small>s</small></strong></div>
+      <div><span>BEST</span><strong id="best">0</strong></div>
+    </div>
+    <div class="time-track" aria-hidden="true"><div id="timeBar"></div></div>
+    <section class="playfield" aria-label="Turtle orchard">
+      <div id="board" class="board" role="group" aria-label="Nine turtle holes, numbered left to right"></div>
+      <div id="overlay" class="overlay">
+        <div class="overlay-card">
+          <div class="intro-art" aria-hidden="true"><img src="turtle.png" alt=""><img src="apple.png" alt=""></div>
+          <p id="overlayLabel" class="eyebrow">APPLE TOSS ARCADE</p>
+          <h2 id="overlayTitle">Ready, aim… apple!</h2>
+          <p id="overlayText">Catch the turtles as they pop up.<br>30 seconds. 10 points per hit.</p>
+          <button id="play" class="primary" type="button" disabled>Loading orchard…</button>
+        </div>
+      </div>
+      <img id="appleCursor" src="apple.png" alt="" aria-hidden="true">
+    </section>
+    <footer>
+      <div class="instructions"><strong>Click or tap a turtle to toss an apple.</strong><span>Keyboard: 1–9 to toss · P to pause</span></div>
+      <button id="pause" class="secondary" type="button" disabled>Pause</button>
+    </footer>
+    <p id="status" class="status" role="status" aria-live="polite">An orchard full of surprises.</p>
+  </main>
+  <script type="module" src="turtle-crusher.js"></script>
+</body>
+</html>

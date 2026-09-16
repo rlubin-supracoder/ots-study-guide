@@ -1,5 +1,6 @@
 import './check.mjs';
 import './check-game.mjs';
+import './check-turtles.mjs';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
