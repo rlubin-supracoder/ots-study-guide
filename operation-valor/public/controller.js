@@ -1,5 +1,6 @@
 import { api, numberLabel, accuracyLabel, ageLabel, timeLabel, setMessage } from './shared.mjs';
 import { groupInfo } from './groups.mjs';
+import { coordinatePanel } from './coordinates.mjs';
 
 const $ = id => document.getElementById(id);
 const participantView = document.body.dataset.view === 'participant';
@@ -35,12 +36,9 @@ function popup(person) {
   group.className = `group-badge ${groupInfo(person.group).className}`;
   group.textContent = groupInfo(person.group).name;
   wrapper.append(group, document.createElement('br'));
-  const detail = document.createElement('span');
-  detail.textContent = `${person.ping.latitude.toFixed(6)}, ${person.ping.longitude.toFixed(6)}`;
-  wrapper.append(detail, document.createElement('br'));
-  const time = document.createElement('small');
-  time.textContent = `${accuracyLabel(person.ping.accuracy)} estimate · captured ${timeLabel(person.ping.capturedAt)}${person.ping.quality === 'approximate' ? ' · approximate' : ''}${style(person) === 'stale' ? ' · stale' : ''}`;
-  wrapper.append(time);
+  const status = document.createElement('small');
+  status.textContent = `${person.ping.quality === 'approximate' ? 'Approximate position' : 'Within accuracy target'}${style(person) === 'stale' ? ' · stale' : ''}`;
+  wrapper.append(status, coordinatePanel(person));
   return wrapper;
 }
 function renderMap(people) {
@@ -107,10 +105,8 @@ function renderRoster() {
     status.textContent = person.ping ? `${ageLabel(person.ping.capturedAt)} · ${accuracyLabel(person.ping.accuracy)} estimate${person.ping.quality === 'approximate' ? ' · approximate' : ''}${style(person) === 'stale' ? ' · stale' : ''}` : 'Awaiting first check-in';
     detail.append(name, groupLabel, status);
     if (person.ping) {
-      const coordinates = document.createElement('small'); coordinates.className = 'coordinates';
-      coordinates.textContent = `${person.ping.latitude.toFixed(6)}, ${person.ping.longitude.toFixed(6)}`;
       const receipt = document.createElement('small'); receipt.textContent = `Received ${timeLabel(person.ping.receivedAt)} · ${person.pingCount} check-in${person.pingCount === 1 ? '' : 's'}`;
-      detail.append(coordinates, receipt);
+      detail.append(receipt);
     }
     row.append(number, detail);
     row.addEventListener('click', () => {
@@ -118,9 +114,11 @@ function renderRoster() {
       if (person.ping && map) { map.setView([person.ping.latitude, person.ping.longitude], Math.max(map.getZoom(), 17)); markers.get(person.number)?.marker.openPopup(); }
       renderRoster();
     });
-    if (participantView) fragment.append(row);
-    else {
-      const entry = document.createElement('div'); entry.className = `roster-entry ${group.className}`;
+    const entry = document.createElement('div'); entry.className = `roster-entry ${group.className}`;
+    entry.append(row);
+    // Copy is a sibling of the map-focus button, never a nested button.
+    if (person.ping) entry.append(coordinatePanel(person));
+    if (!participantView) {
       const remove = document.createElement('button');
       remove.type = 'button'; remove.className = 'remove-participant'; remove.textContent = 'Remove';
       remove.disabled = busy;
@@ -129,8 +127,9 @@ function renderRoster() {
         action = 'remove'; actionParticipantNumber = person.number;
         confirmAction(`Remove ${numberLabel(person.number)} — ${person.name}?`, 'Their code name and latest position will disappear from everyone’s map. They can join again with a new number.', 'Remove participant');
       });
-      entry.append(row, remove); fragment.append(entry);
+      entry.append(remove);
     }
+    fragment.append(entry);
   }
   if (!people.length) { const empty = document.createElement('p'); empty.className = 'empty-roster'; empty.textContent = search || groupFilter ? 'No participants match this group and search.' : 'Participants appear here when they join the exercise.'; fragment.append(empty); }
   $('roster').replaceChildren(fragment);

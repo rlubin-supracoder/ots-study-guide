@@ -14,6 +14,9 @@ importers:
       leaflet:
         specifier: 1.9.4
         version: 1.9.4
+      mgrs:
+        specifier: 2.2.0
+        version: 2.2.0
     devDependencies:
       wrangler:
         specifier: ^4.135.0
@@ -452,6 +455,9 @@ packages:
   leaflet@1.9.4:
     resolution: {integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==}
 
+  mgrs@2.2.0:
+    resolution: {integrity: sha512-BHeewhEJ1n2MOFKvGXFPMxgfczWArFGltBYSZ+JTzlNfHSwJ7gEsXGXFjaU619yLmpmtyoLHu+d8Sd6ACsd0QA==}
+
   miniflare@5.20260918.0-alpha:
     resolution: {integrity: sha512-vyIes7yW/OTzHtz4GhcBCTohZfqk2eQNiIkngZ07VRA5Qu24aNgW/TrFwlPkMLMjWDQ8R4JJBBHR/KX+liSDtg==}
     engines: {node: '>=22.0.0'}
@@ -811,6 +817,8 @@ snapshots:
   kleur@4.1.5: {}
 
   leaflet@1.9.4: {}
+
+  mgrs@2.2.0: {}
 
   miniflare@5.20260918.0-alpha:
     dependencies:

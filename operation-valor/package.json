@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "jose": "^6.2.12",
-    "leaflet": "1.9.4"
+    "leaflet": "1.9.4",
+    "mgrs": "2.2.0"
   },
   "devDependencies": {
     "wrangler": "^4.135.0",

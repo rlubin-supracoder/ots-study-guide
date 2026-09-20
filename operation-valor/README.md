@@ -52,6 +52,8 @@ Group colors are consistent across marker fills, participant rows, and identity 
 
 Each marker has a number. Selecting it shows the code name, coordinates, reported accuracy, and the time the phone captured the position. The circle around the marker shows the phone's **estimated** accuracy. It is a helpful visual guide, not a guaranteed boundary.
 
+The roster, map popups, and your latest check-in receipt show **MGRS military grid coordinates** alongside latitude/longitude. MGRS uses WGS 84 with five digits per axis (one-meter grid precision); that precision does not improve the phone's reported accuracy. **Copy coordinates** copies both formats, the code name and group, the phone's accuracy estimate, and capture/receipt timestamps in UTC. Displayed capture times include the local time zone. Conversion happens in the browser using the bundled `mgrs` library, without sending coordinates to a conversion service. For polar locations outside the library's 80°S–84°N range, latitude/longitude remains available and the MGRS field says it is unavailable.
+
 - **Within target:** The latest reading reported 5 meters or better.
 - **Approximate:** The person chose to send a reading over 5 meters.
 - **Stale:** The latest reading is more than 5 minutes old. The marker stays on the map, but it should not be treated as a live position.

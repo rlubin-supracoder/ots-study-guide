@@ -26,4 +26,5 @@ export function ageLabel(timestamp) {
   return `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m ago`;
 }
 export const timeLabel = timestamp => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+export const dateTimeLabel = timestamp => new Date(timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
 export function setMessage(text, kind = '') { const node = document.getElementById('message'); node.textContent = text; node.className = `message ${kind}`; }

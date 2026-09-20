@@ -1,6 +1,7 @@
 import { acquirePosition } from './acquire.mjs';
 import { api, numberLabel, accuracyLabel, timeLabel, setMessage } from './shared.mjs';
 import { GROUPS, groupInfo } from './groups.mjs';
+import { coordinatePanel } from './coordinates.mjs';
 
 const $ = id => document.getElementById(id);
 let session;
@@ -36,8 +37,19 @@ function render() {
     $('checkinCard').className = `card checkin-card ${group.className}`;
     const ping = session.participant.ping;
     $('receipt').hidden = !ping;
+    $('ownCoordinates').hidden = !ping;
     if (ping) {
       $('receiptText').textContent = `Captured ${timeLabel(ping.capturedAt)} · received ${timeLabel(ping.receivedAt)} · ${accuracyLabel(ping.accuracy)} estimate${ping.quality === 'approximate' ? ' (approximate)' : ''}`;
+      if (!acquisition && !busy && !pending) $('accuracyValue').textContent = accuracyLabel(ping.accuracy);
+      const key = `${session.exerciseId}:${ping.requestId}:${session.participant.group}`;
+      if ($('ownCoordinates').dataset.ping !== key) {
+        $('ownCoordinates').replaceChildren(coordinatePanel(session.participant));
+        $('ownCoordinates').dataset.ping = key;
+      }
+    } else {
+      if (!acquisition && !busy && !pending) $('accuracyValue').textContent = '—';
+      $('ownCoordinates').replaceChildren();
+      delete $('ownCoordinates').dataset.ping;
     }
   }
 }

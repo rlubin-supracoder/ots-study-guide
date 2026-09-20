@@ -6,4 +6,6 @@ for (const name of ['leaflet.js', 'leaflet.css']) {
 }
 await copyFile(new URL('../node_modules/leaflet/LICENSE', import.meta.url), new URL('leaflet-LICENSE.txt', out));
 await cp(new URL('../node_modules/leaflet/dist/images/', import.meta.url), new URL('images/', out), { recursive: true });
-console.log('Local map assets ready.');
+await copyFile(new URL('../node_modules/mgrs/mgrs.js', import.meta.url), new URL('mgrs.mjs', out));
+await copyFile(new URL('../node_modules/mgrs/license.md', import.meta.url), new URL('mgrs-LICENSE.txt', out));
+console.log('Local map and coordinate assets ready.');
