@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "operation-valor",
+  "account_id": "930c639ccd874fcb5c1de90de6d61363",
+  "routes": [
+    {
+      "pattern": "valor.russelllubinski.us",
+      "custom_domain": true
+    }
+  ],
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EXERCISE",
+        "class_name": "ValorExercise"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "ValorExercise"
+      ]
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://valor.russelllubinski.us",
+    "ACCESS_TEAM_DOMAIN": "russell-lubinski-valor.cloudflareaccess.com",
+    "ACCESS_AUD": "413d7fc5536a7a0a654a6126da601a59cb40db9d39b3a15415a172f059c1b52e"
+  },
+  "observability": {
+    "enabled": false
+  }
+}

@@ -5,6 +5,9 @@
   const title = document.getElementById('secretGameTitle');
   let launcher;
   let activeGame;
+  document.addEventListener('valor:open', () => {
+    window.location.assign('https://valor.russelllubinski.us/');
+  });
   function openGame(game, button) {
     if (dialog.open) return;
     launcher = button;

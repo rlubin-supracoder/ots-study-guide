@@ -724,7 +724,11 @@
 
   passwordForm.addEventListener("submit", function(ev){
     ev.preventDefault();
-    if (passwordInput.value.trim().toLowerCase() === "turtles"){
+    if (passwordInput.value.trim().toLowerCase() === "valor"){
+      passwordInput.value = "";
+      passwordError.textContent = "";
+      document.dispatchEvent(new CustomEvent("valor:open"));
+    } else if (passwordInput.value.trim().toLowerCase() === "turtles"){
       passwordInput.value = "";
       passwordError.textContent = "";
       document.dispatchEvent(new CustomEvent("turtle-crusher:open"));
