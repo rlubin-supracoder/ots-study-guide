@@ -4,18 +4,19 @@
 <body class="participant-page">
   <header class="topbar"><a class="wordmark" href="/" aria-label="Operation Valor home"><span class="compass" aria-hidden="true">✦</span><span>OPERATION <b>VALOR</b></span></a><a class="quiet-link" href="https://rlubin-supracoder.github.io/ots-study-guide/">OTS Trainer ↗</a></header>
   <main class="participant-shell">
-    <div class="eyebrow">OTS / LAND NAVIGATION</div><h1>Your position.<br><span>Your check-in.</span></h1><p class="lede">A clear signal to your exercise controller.</p>
+    <div class="eyebrow">OTS / LAND NAVIGATION</div><h1>Your position.<br><span>Your check-in.</span></h1><p class="lede">A shared picture for your entire team.</p>
     <div class="exercise-line"><span id="exerciseStatus" class="badge">Connecting</span><span id="connectionStatus">Checking exercise status…</span></div>
-    <section id="joinCard" class="card" hidden><div class="section-label">01 / IDENTIFY</div><h2>Choose your code name.</h2><p>Use the name assigned for this exercise. Your number stays with you in this browser.</p><form id="joinForm"><label for="codeName">Code name</label><input id="codeName" name="name" maxlength="24" autocomplete="off" placeholder="e.g. Wolf" required><button id="joinButton" class="button primary" type="submit">Join exercise <span aria-hidden="true">→</span></button></form></section>
+    <section id="joinCard" class="card" hidden><div class="section-label">01 / IDENTIFY</div><h2>Choose your code name.</h2><p>Use the name assigned for this exercise. Your number stays with you in this browser. Your check-ins will be visible to everyone who joins the exercise.</p><form id="joinForm"><label for="codeName">Code name</label><input id="codeName" name="name" maxlength="24" autocomplete="off" placeholder="e.g. Wolf" required><button id="joinButton" class="button primary" type="submit">Join exercise <span aria-hidden="true">→</span></button></form></section>
     <section id="checkinCard" class="card checkin-card" hidden><div class="identity-row"><div><div class="section-label">YOUR CALL SIGN</div><h2 id="participantName"></h2></div><div class="number-tag"><span>NO.</span><strong id="participantNumber"></strong></div></div>
       <button id="sendLocation" class="send-button" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5v7M24 36v7M5 24h7M36 24h7"/><circle cx="24" cy="24" r="13"/><circle cx="24" cy="24" r="4"/></svg><span id="sendLabel">Send my location</span><small id="sendHint">ONE TAP. ONE CHECK-IN.</small></button>
       <div class="quality-row"><div><span>ACCURACY TARGET</span><strong>5 meters</strong></div><div><span>LATEST GPS ESTIMATE</span><strong id="accuracyValue">—</strong></div></div>
       <div id="approximateActions" class="action-stack" hidden><button id="retryFix" class="button primary" type="button">Try for a better position</button><button id="sendApproximate" class="button secondary" type="button">Send approximate position</button></div>
       <button id="retryDelivery" class="button secondary" type="button" hidden>Retry delivery</button>
       <div id="receipt" class="receipt" hidden><span class="receipt-check" aria-hidden="true">✓</span><div><strong>Location received</strong><p id="receiptText"></p></div></div>
+      <a class="button secondary team-map-link" href="/map">View team map <span aria-hidden="true">→</span></a>
     </section>
     <div id="message" class="message" role="status" aria-live="polite">Connecting to Operation Valor…</div>
-    <div class="field-note"><span class="note-mark" aria-hidden="true">i</span><p>Your location is shared with authorized exercise controllers <strong>only when you send a check-in</strong>. Allow location access and keep this page open while it acquires your position.</p></div>
+    <div class="field-note"><span class="note-mark" aria-hidden="true">i</span><p>Your location is shared with all joined participants and the exercise admin <strong>only when you send a check-in</strong>. Allow location access and keep this page open while it acquires your position.</p></div>
     <footer class="participant-footer"><span>RUSSELL LUBINSKI / 27-01</span><a href="/privacy.html">Location & privacy</a></footer>
   </main><script type="module" src="/participant.js"></script>
 </body></html>

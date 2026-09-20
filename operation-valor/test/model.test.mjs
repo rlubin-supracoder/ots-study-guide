@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, changeExercise, register, recordPing, publicParticipant, validatePing, RETENTION_MS } from '../src/model.mjs';
+import { initialState, changeExercise, register, recordPing, publicParticipant, validatePing, removeParticipant, RETENTION_MS } from '../src/model.mjs';
 import { controllerIdentity, requireSameOrigin, readBody } from '../src/auth.mjs';
 const start = () => changeExercise(initialState(), 'start', Date.now());
 const fix = (overrides = {}) => ({ latitude: 32.38, longitude: -86.36, accuracy: 4, capturedAt: Date.now(), requestId: crypto.randomUUID(), ...overrides });
@@ -46,6 +46,18 @@ test('end blocks joins and pings; clear resets exercise and numbering', () => {
   assert.throws(() => changeExercise(state, 'start', Date.now()), /Clear/);
   changeExercise(state, 'clear', Date.now());
   assert.equal(state.participants.length, 0); assert.equal(state.nextNumber, 1); assert.notEqual(state.exerciseId, originalId);
+});
+
+test('removing a participant erases their position without renumbering others', () => {
+  const state = start();
+  register(state, 'Wolf', 'a', Date.now()); register(state, 'Falcon', 'b', Date.now());
+  recordPing(state, 'a', state.exerciseId, fix(), Date.now());
+  removeParticipant(state, 1);
+  assert.deepEqual(state.participants.map(person => person.number), [2]);
+  assert.throws(() => recordPing(state, 'a', state.exerciseId, fix(), Date.now()), /Join/);
+  assert.throws(() => removeParticipant(state, 1), /already been removed/);
+  assert.throws(() => removeParticipant(state, '2'), /Invalid/);
+  assert.equal(register(state, 'Wolf', 'a', Date.now()).number, 3);
 });
 test('controller authentication fails closed, including forged identity headers', async () => {
   const request = new Request('https://valor.russelllubinski.us/api/control/state', { headers: { 'Cf-Access-Authenticated-User-Email': 'someone@example.com', 'X-Controller': 'verified' } });

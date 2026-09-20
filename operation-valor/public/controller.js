@@ -1,12 +1,15 @@
 import { api, numberLabel, accuracyLabel, ageLabel, timeLabel, setMessage } from './shared.mjs';
 
 const $ = id => document.getElementById(id);
+const participantView = document.body.dataset.view === 'participant';
+const apiRoot = participantView ? '/api/team' : '/api/control';
 let snapshot;
 let socket;
 let reconnect;
 let selected;
 let action;
 let actionExerciseId;
+let actionParticipantNumber;
 let busy = false;
 let map;
 let tiles;
@@ -97,7 +100,19 @@ function renderRoster() {
       if (person.ping && map) { map.setView([person.ping.latitude, person.ping.longitude], Math.max(map.getZoom(), 17)); markers.get(person.number)?.marker.openPopup(); }
       renderRoster();
     });
-    fragment.append(row);
+    if (participantView) fragment.append(row);
+    else {
+      const entry = document.createElement('div'); entry.className = 'roster-entry';
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'remove-participant'; remove.textContent = 'Remove';
+      remove.disabled = busy;
+      remove.setAttribute('aria-label', `Remove ${numberLabel(person.number)} ${person.name}`);
+      remove.addEventListener('click', () => {
+        action = 'remove'; actionParticipantNumber = person.number;
+        confirmAction(`Remove ${numberLabel(person.number)} — ${person.name}?`, 'Their code name and latest position will disappear from everyone’s map. They can join again with a new number.', 'Remove participant');
+      });
+      entry.append(row, remove); fragment.append(entry);
+    }
   }
   if (!people.length) { const empty = document.createElement('p'); empty.className = 'empty-roster'; empty.textContent = search ? 'No matching participants.' : 'Participants appear here when they join the exercise.'; fragment.append(empty); }
   $('roster').replaceChildren(fragment);
@@ -108,9 +123,11 @@ function render() {
   const people = snapshot.participants;
   $('exerciseStatus').textContent = snapshot.status === 'active' ? 'Exercise active' : snapshot.status === 'ended' ? 'Exercise ended' : 'Stand by';
   $('exerciseStatus').className = `badge ${snapshot.status === 'active' ? 'active' : ''}`;
-  $('startExercise').disabled = busy || snapshot.status === 'active' || people.length > 0;
-  $('endExercise').disabled = busy || snapshot.status !== 'active';
-  $('clearExercise').disabled = busy || snapshot.status === 'active' || (snapshot.status === 'standby' && !people.length);
+  if (!participantView) {
+    $('startExercise').disabled = busy || snapshot.status === 'active' || people.length > 0;
+    $('endExercise').disabled = busy || snapshot.status !== 'active';
+    $('clearExercise').disabled = busy || snapshot.status === 'active' || (snapshot.status === 'standby' && !people.length);
+  }
   $('totalCount').textContent = $('rosterCount').textContent = people.length;
   $('pingCount').textContent = people.filter(person => person.ping).length;
   $('qualityCount').textContent = people.filter(person => person.ping?.accuracy <= 5).length;
@@ -119,19 +136,30 @@ function render() {
   renderRoster(); renderMap(people);
 }
 function receive(data) {
+  if (signedOut) return;
   if (snapshot?.exerciseId !== data.exerciseId) { selected = undefined; fitted = false; }
   snapshot = data; render();
 }
+function endSession(message) {
+  signedOut = true; busy = true; clearTimeout(reconnect); socket?.close();
+  snapshot = { status: 'standby', participants: [], expiresAt: null };
+  selected = undefined; render();
+  if (tiles) { map.removeLayer(tiles); tiles = null; }
+  map?.setView([0, 0], 2);
+  $('liveStatus').textContent = participantView ? 'Join to view' : 'Sign in again';
+  $('liveStatus').className = 'badge warn';
+  setMessage(message, 'error');
+}
 async function refresh() {
-  try { receive(await api('/api/control/state')); }
+  try { receive(await api(`${apiRoot}/state`)); }
   catch (error) {
     setMessage(error.message, 'error');
-    if (error.status === 401 || error.status === 403) { signedOut = true; socket?.close(); }
+    if (error.status === 401 || error.status === 403) endSession(error.message);
   }
 }
 function connect() {
   if (signedOut) return;
-  const url = new URL('/api/control/live', location.origin); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = new URL(`${apiRoot}/live`, location.origin); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   socket = new WebSocket(url);
   socket.addEventListener('open', () => {
     $('liveStatus').textContent = 'Live connection'; $('liveStatus').className = 'badge online';
@@ -142,8 +170,9 @@ function connect() {
     try { receive(JSON.parse(event.data)); } catch { setMessage('An update could not be read. Reconnecting…', 'error'); socket.close(); }
   });
   socket.addEventListener('close', event => {
+    if (signedOut) return;
     $('liveStatus').textContent = 'Reconnecting'; $('liveStatus').className = 'badge warn';
-    if (event.code === 4001) { signedOut = true; $('liveStatus').textContent = 'Sign in again'; setMessage('Controller session expired. Reload this page to sign in again.', 'error'); return; }
+    if (event.code === 4001) { endSession(participantView ? 'Your participation has ended or the exercise was cleared. Return to check-in to join again.' : 'Controller session expired. Reload this page to sign in again.'); return; }
     if (!signedOut) { refresh(); clearTimeout(reconnect); reconnect = setTimeout(connect, 5000); }
   });
   socket.addEventListener('error', () => setMessage('Live connection interrupted. Checking for updates and reconnecting…', 'error'));
@@ -154,18 +183,24 @@ const descriptions = {
   end: ['End this exercise?', 'New check-ins will stop. The current map and roster remain available until you clear them or the retention period expires.', 'End exercise'],
   clear: ['Clear this exercise’s data?', 'This removes all code names and positions from the app and resets participant numbering. This cannot be undone from the app.', 'Clear data'],
 };
+function confirmAction(title, text, button) {
+  actionExerciseId = snapshot.exerciseId;
+  $('confirmTitle').textContent = title; $('confirmText').textContent = text; $('confirmButton').textContent = button;
+  $('confirmAction').returnValue = 'cancel'; $('confirmAction').showModal();
+}
 for (const [id, kind] of [['startExercise', 'start'], ['endExercise', 'end'], ['clearExercise', 'clear']]) {
-  $(id).addEventListener('click', () => {
-    action = kind; actionExerciseId = snapshot.exerciseId;
-    const [title, text, button] = descriptions[kind];
-    $('confirmTitle').textContent = title; $('confirmText').textContent = text; $('confirmButton').textContent = button;
-    $('confirmAction').returnValue = 'cancel'; $('confirmAction').showModal();
+  $(id)?.addEventListener('click', () => {
+    action = kind;
+    confirmAction(...descriptions[kind]);
   });
 }
-$('confirmAction').addEventListener('close', async () => {
+$('confirmAction')?.addEventListener('close', async () => {
   if ($('confirmAction').returnValue !== 'confirm' || busy) return;
   busy = true; render();
-  try { receive(await api('/api/control/action', { action, exerciseId: actionExerciseId })); setMessage(action === 'start' ? 'Exercise opened. Participants can now join.' : action === 'end' ? 'Exercise ended. New check-ins are closed.' : 'Exercise data cleared. Ready for a new exercise.', 'success'); }
+  try {
+    receive(await api(action === 'remove' ? '/api/control/remove' : '/api/control/action', { action, exerciseId: actionExerciseId, number: actionParticipantNumber }));
+    setMessage(action === 'remove' ? 'Participant removed from the shared map and roster.' : action === 'start' ? 'Exercise opened. Participants can now join.' : action === 'end' ? 'Exercise ended. New check-ins are closed.' : 'Exercise data cleared. Ready for a new exercise.', 'success');
+  }
   catch (error) { setMessage(error.message, 'error'); await refresh(); }
   finally { busy = false; render(); }
 });

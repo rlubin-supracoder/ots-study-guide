@@ -2,9 +2,9 @@ dist/
 .reference/
 .local/
 node_modules/
+.pnpm-store/
 reference.html
 *.log
 .wrangler/
 .dev.vars*
 .env*
-

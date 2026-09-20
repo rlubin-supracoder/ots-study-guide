@@ -35,13 +35,14 @@ async function refresh() {
   refreshBusy = true;
   try {
     const next = await api('/api/session');
-    const changed = session && (session.exerciseId !== next.exerciseId || (session.status === 'active' && next.status !== 'active'));
+    const removed = session?.participant && !next.participant && session.exerciseId === next.exerciseId;
+    const changed = session && (removed || session.exerciseId !== next.exerciseId || (session.status === 'active' && next.status !== 'active'));
     if (changed) {
       generation++;
       acquisition?.cancel(); acquisition = null; pending = null; busy = false;
       $('approximateActions').hidden = $('retryDelivery').hidden = true;
       resetButton();
-      setMessage(next.status === 'active' ? 'A new exercise has started. Join with your code name.' : 'The exercise has closed. No new positions will be sent.');
+      setMessage(removed ? 'The admin removed your entry. Join again if you need a new number.' : next.status === 'active' ? 'A new exercise has started. Join with your code name.' : 'The exercise has closed. No new positions will be sent.');
     } else if (!session) {
       setMessage(next.status === 'active' ? (next.participant ? 'Ready when you are. Each press sends one location.' : 'Join the exercise to receive your number.') : 'Your controller will open the exercise when it is time to begin.');
     }
@@ -109,7 +110,7 @@ async function deliver(currentGeneration = generation) {
     if (currentGeneration !== generation) return;
     session.participant = result.participant;
     pending = null;
-    setMessage(`Location received. You are marker ${numberLabel(session.participant.number)} on the controller’s map.`, 'success');
+    setMessage(`Location received. You are marker ${numberLabel(session.participant.number)} on the shared team map.`, 'success');
   } catch (error) {
     if (currentGeneration !== generation) return;
     setMessage(error.message, 'error');

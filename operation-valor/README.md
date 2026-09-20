@@ -3,8 +3,9 @@
 Russell Lubinski, 27-01
 
 - Participants: https://valor.russelllubinski.us/ or enter `Valor` in OTS Trainer.
-- Controller: https://valor.russelllubinski.us/control (Cloudflare Access sign-in).
-- Start an exercise, share the participant address, then end and clear it afterward.
+- Shared map: https://valor.russelllubinski.us/map (join the exercise first). All participants can see everyone’s latest check-in.
+- Admin: https://valor.russelllubinski.us/control (Cloudflare Access sign-in).
+- The admin starts/ends exercises, removes individual participants, and clears data. Other participants can view the map and submit their own check-ins.
 - Each participant keeps one number and their latest check-in. Data clears 24 hours after exercise start.
 - Five meters is the phone's reported accuracy target, not a guaranteed distance. Less precise fixes require explicit participant confirmation.
 

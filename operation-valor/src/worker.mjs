@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { AppError, initialState, publicParticipant, register, recordPing, changeExercise } from './model.mjs';
+import { AppError, initialState, publicParticipant, register, recordPing, changeExercise, removeParticipant } from './model.mjs';
 import { controllerIdentity, requireSameOrigin, readBody, participantToken, newToken, digest, localPreview } from './auth.mjs';
 
 const headers = {
@@ -47,7 +47,7 @@ export default {
           internal.set('Content-Type', 'application/json');
         } else if (request.method !== 'GET') throw new AppError('Method not allowed.', 405);
         if (token) internal.set('X-Participant-Hash', await digest(token));
-        if (path === '/api/control/live') {
+        if (path === '/api/control/live' || path === '/api/team/live') {
           const expected = localPreview(request, env) ? url.origin : env.APP_ORIGIN;
           if (request.headers.get('Origin') !== expected) throw new AppError('Invalid connection origin.', 403);
           if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') throw new AppError('WebSocket required.', 426);
@@ -65,6 +65,7 @@ export default {
       if (request.method !== 'GET' && request.method !== 'HEAD') throw new AppError('Method not allowed.', 405);
       const assetUrl = new URL(request.url);
       if (path === '/') assetUrl.pathname = '/index.html';
+      else if (path === '/map' || path === '/map/') assetUrl.pathname = '/map.html';
       else if (path === '/control' || path === '/control/') assetUrl.pathname = '/control.html';
       else if (path === '/control.html') throw new AppError('Use /control to sign in.', 404);
       return decorate(await env.ASSETS.fetch(new Request(assetUrl, request)));
@@ -85,11 +86,19 @@ export class ValorExercise extends DurableObject {
     return { exerciseId, status, startedAt, endedAt, expiresAt, participants: this.state.participants.map(publicParticipant), serverTime: Date.now() };
   }
   async save() { await this.ctx.storage.put('exercise', this.state); }
+  socketAllowed(ws) {
+    const identity = ws.deserializeAttachment();
+    if (!identity || identity.expiresAt <= Date.now()) return false;
+    // Existing controller connections have no role field until they reconnect.
+    if (!identity.role || identity.role === 'controller') return true;
+    return identity.exerciseId === this.state.exerciseId &&
+      this.state.participants.some(person => person.tokenHash === identity.tokenHash);
+  }
   broadcast() {
     const message = JSON.stringify(this.snapshot());
     for (const ws of this.ctx.getWebSockets()) {
       try {
-        if (ws.deserializeAttachment()?.expiresAt <= Date.now()) ws.close(4001, 'Sign in again');
+        if (!this.socketAllowed(ws)) ws.close(4001, 'Session ended');
         else ws.send(message);
       } catch { try { ws.close(); } catch {} }
     }
@@ -115,12 +124,21 @@ export class ValorExercise extends DurableObject {
           return json({ exerciseId: this.state.exerciseId, status: this.state.status, expiresAt: this.state.expiresAt, participant: publicParticipant(person) });
         }
         if (path.startsWith('/api/control/') && request.headers.get('X-Controller') !== 'verified') throw new AppError('Controller sign-in required.', 401);
-        if (path === '/api/control/state' && request.method === 'GET') return json(this.snapshot());
-        if (path === '/api/control/live' && request.method === 'GET') {
-          if (this.ctx.getWebSockets().length >= 20) throw new AppError('Too many controller connections.', 429);
+        const team = path.startsWith('/api/team/');
+        if (team && !person) throw new AppError('Join the exercise to view the shared map.', 401);
+        if ((path === '/api/control/state' || path === '/api/team/state') && request.method === 'GET') return json(this.snapshot());
+        if ((path === '/api/control/live' || path === '/api/team/live') && request.method === 'GET') {
+          const connections = this.ctx.getWebSockets();
+          const matching = connections.filter(ws => {
+            const identity = ws.deserializeAttachment();
+            return team ? identity?.tokenHash === hash : identity?.role !== 'participant';
+          });
+          if (matching.length >= (team ? 3 : 20) || connections.length >= 320) throw new AppError('Too many map connections. Close another map tab and retry.', 429);
           const pair = new WebSocketPair();
           this.ctx.acceptWebSocket(pair[1]);
-          pair[1].serializeAttachment({ expiresAt: Number(request.headers.get('X-Controller-Expires')) * 1000 });
+          pair[1].serializeAttachment(team ? {
+            role: 'participant', tokenHash: hash, exerciseId: this.state.exerciseId, expiresAt: this.state.expiresAt,
+          } : { role: 'controller', expiresAt: Number(request.headers.get('X-Controller-Expires')) * 1000 });
           pair[1].send(JSON.stringify(this.snapshot()));
           return new Response(null, { status: 101, webSocket: pair[0] });
         }
@@ -136,6 +154,12 @@ export class ValorExercise extends DurableObject {
           const updated = recordPing(this.state, hash, body.exerciseId, body, now);
           await this.save(); this.broadcast();
           return json({ exerciseId: this.state.exerciseId, participant: publicParticipant(updated) });
+        }
+        if (path === '/api/control/remove') {
+          if (body.exerciseId !== this.state.exerciseId) throw new AppError('The exercise changed. Refresh before continuing.', 409);
+          removeParticipant(this.state, body.number);
+          await this.save(); this.broadcast();
+          return json(this.snapshot());
         }
         if (path === '/api/control/action') {
           if (body.exerciseId !== this.state.exerciseId) throw new AppError('The exercise changed. Refresh before continuing.', 409);
@@ -158,7 +182,7 @@ export class ValorExercise extends DurableObject {
     }
   }
   async webSocketMessage(ws, message) {
-    if (ws.deserializeAttachment()?.expiresAt <= Date.now()) return ws.close(4001, 'Sign in again');
+    if (!this.socketAllowed(ws)) return ws.close(4001, 'Session ended');
     if (message === 'ping') ws.send('pong');
     else ws.close(1008, 'Unsupported message');
   }

@@ -72,6 +72,15 @@ export function recordPing(state, tokenHash, exerciseId, body, now) {
   return person;
 }
 
+export function removeParticipant(state, number) {
+  if (!Number.isInteger(number) || number < 1) throw new AppError('Invalid participant number.');
+  const index = state.participants.findIndex(person => person.number === number);
+  if (index === -1) throw new AppError('This participant has already been removed.', 404);
+  state.participants.splice(index, 1);
+  // Keep remaining numbers stable; do not reuse a removed participant's number.
+  return state;
+}
+
 export function changeExercise(state, action, now) {
   if (action === 'start') {
     if (state.status === 'active') throw new AppError('The exercise is already active.', 409);
