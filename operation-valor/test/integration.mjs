@@ -37,10 +37,14 @@ async function openMap(cookie) {
 }
 let state = await reset();
 state = (await request('/api/control/action', { action: 'start', exerciseId: state.exerciseId })).data;
-const people = await Promise.all(Array.from({ length: 100 }, (_, index) => request('/api/join', { name: `Test ${index + 1}` })));
+for (const group of [undefined, '', 'Delta', '<script>']) {
+  assert.equal((await request('/api/join', { name: 'Invalid group', group })).status, 400);
+}
+const people = await Promise.all(Array.from({ length: 100 }, (_, index) => request('/api/join', { group: ['Alpha', 'Bravo', 'Charlie'][index % 3], name: `Test ${index + 1}` })));
 assert(people.every(person => person.status === 200));
+assert(people.every((person, index) => person.data.participant.group === ['Alpha', 'Bravo', 'Charlie'][index % 3]));
 assert.equal(new Set(people.map(person => person.data.participant.number)).size, 100);
-assert.equal((await request('/api/join', { name: 'Extra' })).status, 409);
+assert.equal((await request('/api/join', { group: 'Alpha', name: 'Extra' })).status, 409);
 assert.equal((await request('/api/team/state')).status, 401, 'Anonymous visitors cannot read the shared roster');
 assert.equal((await request('/api/team/state', undefined, 'valor-dev=invalid')).status, 401);
 const maps = await Promise.all(people.slice(0, 25).map(person => openMap(person.cookie)));
@@ -56,6 +60,8 @@ const shared = await request('/api/team/state', undefined, people[0].cookie);
 assert.equal(shared.data.participants.length, 100);
 assert.equal(shared.data.participants.filter(person => person.ping).length, 20);
 assert(shared.data.participants.every(person => !('tokenHash' in person)));
+assert.deepEqual(shared.data.participants.map(person => person.group), snapshot.participants.map(person => person.group));
+assert(maps.every(map => map.updates.at(-1).participants.every(person => ['Alpha', 'Bravo', 'Charlie'].includes(person.group))));
 // localhost is deliberately outside the 127.0.0.1-only controller preview bypass.
 const protectedBase = base.replace('127.0.0.1', 'localhost');
 const participantCookie = people[0].cookie.replace('valor-dev=', '__Host-valor=');
@@ -69,11 +75,13 @@ assert.equal((await request('/api/team/remove', { exerciseId: state.exerciseId, 
 const isolated = (await request('/api/session', undefined, people[0].cookie)).data;
 assert(!('participants' in isolated));
 assert.equal(isolated.participant.number, people[0].data.participant.number);
+assert.equal(isolated.participant.group, 'Alpha');
+assert.equal((await request('/api/join', { name: 'Renamed', group: 'Charlie' }, people[0].cookie)).data.participant.group, 'Alpha', 'Join retries preserve the assigned group');
 assert.equal((await request('/api/ping', fixes[0])).status, 401);
 assert.equal((await request('/api/ping', fixes[0], people[0].cookie)).data.participant.pingCount, 1);
 const crossOrigin = await fetch(base + '/api/ping', { method: 'POST', headers: { ...headers, Origin: 'https://unrelated.example' }, body: JSON.stringify(fixes[0]) });
 assert.equal(crossOrigin.status, 403);
-const duplicate = await request('/api/join', { name: 'Test 1' });
+const duplicate = await request('/api/join', { group: 'Alpha', name: 'Test 1' });
 assert.equal(duplicate.status, 409);
 const removedNumber = people[0].data.participant.number;
 assert.equal((await request('/api/control/remove', { exerciseId: 'old-exercise', number: removedNumber })).status, 409);
@@ -83,7 +91,7 @@ assert.equal((await request('/api/team/state', undefined, people[0].cookie)).sta
 assert.equal((await request('/api/ping', fixes[0], people[0].cookie)).status, 401);
 await until(() => maps.slice(1).every(map => !map.updates.at(-1).participants.some(person => person.number === removedNumber)));
 assert.equal((await request('/api/session', undefined, people[1].cookie)).data.participant.number, people[1].data.participant.number);
-const rejoined = await request('/api/join', { name: 'Test 1' }, people[0].cookie);
+const rejoined = await request('/api/join', { group: 'Alpha', name: 'Test 1' }, people[0].cookie);
 assert.equal(rejoined.data.participant.number, 101, 'Removed numbers are not reused');
 state = (await request('/api/control/action', { action: 'end', exerciseId: state.exerciseId })).data;
 assert.equal((await request('/api/ping', fixes[0], people[0].cookie)).status, 409);
@@ -94,8 +102,8 @@ console.log('Integration passed: 100 registrations, 20 simultaneous pings, 25 li
 
 // Seed a clearly named, local-only synthetic exercise for visual verification.
 state = (await request('/api/control/action', { action: 'start', exerciseId: (await request('/api/control/state')).data.exerciseId })).data;
-for (const [index, name] of ['Demo Wolf', 'Demo Falcon', 'Demo Raven'].entries()) {
-  const person = await request('/api/join', { name });
-  if (index < 2) await request('/api/ping', { exerciseId: state.exerciseId, requestId: crypto.randomUUID(), latitude: 40.781 + index * .0008, longitude: -73.966 + index * .0006, accuracy: index ? 12 : 4, capturedAt: Date.now(), acceptApproximate: !!index }, person.cookie);
+for (const [index, name] of ['Demo Wolf', 'Demo Falcon', 'Demo Raven', 'Demo Eagle'].entries()) {
+  const person = await request('/api/join', { name, group: ['Alpha', 'Bravo', 'Charlie'][index % 3] });
+  if (index < 3) await request('/api/ping', { exerciseId: state.exerciseId, requestId: crypto.randomUUID(), latitude: 40.781 + index * .0008, longitude: -73.966 + index * .0006, accuracy: index === 1 ? 12 : 4, capturedAt: Date.now() - (index === 2 ? 360000 : 0), acceptApproximate: index === 1 }, person.cookie);
 }
-console.log('Local preview seeded with three demo participants and two synthetic Central Park locations.');
+console.log('Local preview seeded with four grouped demo participants and three synthetic Central Park locations.');

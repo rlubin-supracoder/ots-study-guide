@@ -8,3 +8,40 @@
 @media(max-width:760px){.topbar{padding:0 19px;height:70px}.staff-label{display:none}.control-shell{padding:28px 16px}.control-heading{display:block}.exercise-tools{justify-content:flex-start;margin-top:23px;max-width:none}.metrics{grid-template-columns:1fr 1fr}.metrics>div:nth-child(3){border-left:0}.metrics>div:nth-child(n+3){border-top:1px solid var(--line)}.metrics>div{padding:16px}.metrics small{grid-column:auto}.metrics strong{font-size:28px}.operations-grid{grid-template-columns:1fr}.map-panel #map{height:400px}.roster{height:auto;max-height:450px}.control-footer{display:block}.control-footer p{margin-bottom:10px}.control-heading h1{font-size:37px}.control-message{font-size:12px}.controller-meta{gap:8px}}
 @media(max-width:380px){.participant-shell{padding:32px 17px 20px}.card{padding:21px}.send-button{width:205px;height:205px}.wordmark{font-size:9px;gap:9px}.wordmark b{font-size:16px}.compass{font-size:42px}.quiet-link{font-size:10px}.participant-footer{font-size:8px}.metrics small{grid-column:span 2}.map-legend{gap:12px}.exercise-tools .button{font-size:11px;padding:10px 12px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Group colors remain consistent independently of location freshness and accuracy. */
+.group-alpha{--group-color:#64a5fa;--group-tint:#192e48}
+.group-bravo{--group-color:#ffb15b;--group-tint:#3a2b20}
+.group-charlie{--group-color:#c19aff;--group-tint:#30253f}
+.group-unassigned{--group-color:#a2b0b9;--group-tint:#26313b}
+.group-dot{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;background:var(--group-color)}
+.group-badge{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 7px;border:1px solid var(--group-color);border-radius:4px;background:var(--group-tint);color:var(--group-color);font:10px monospace}
+.group-choices{margin:20px 0 0;padding:0;border:0;min-width:0}
+.group-choices legend{padding:0;margin-bottom:10px;font-size:13px}
+.group-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.group-option{position:relative;margin:0;cursor:pointer;min-width:0}
+.group-option input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.group-option>span{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:9px 4px;border:1px solid #52616d;border-radius:6px;background:#101b24;font-size:12px}
+.group-option input:checked+span{background:var(--group-tint);border:2px solid var(--group-color);padding:8px 3px;color:var(--group-color);font-weight:bold}
+.group-option input:focus-visible+span{outline:2px solid var(--group-color);outline-offset:3px}
+.group-choices:disabled{opacity:.65}
+.checkin-card .number-tag{border-color:var(--group-color);background:var(--group-tint)}
+.checkin-card .number-tag strong{color:var(--group-color)}
+.roster-filters{padding:15px;display:grid;gap:9px}
+.roster-filters label{margin:0;font-size:11px;color:var(--muted)}
+.roster-filters input,.roster-filters select{width:100%;font:12px Arial,sans-serif;color:var(--ink);padding:12px;border:1px solid #4d5c68;border-radius:7px;background:#0d171f;min-height:44px}
+.roster-filters select:focus-visible{outline:2px solid #fba39c;outline-offset:3px}
+.filter-summary{font-size:10px;line-height:1.6;color:var(--muted)}
+.roster-row[class*="group-"],.roster-entry[class*="group-"]{background:var(--group-tint)}
+.roster-row[class*="group-"]{border-left:3px solid var(--group-color);margin-bottom:6px}
+.roster-entry[class*="group-"]{border-radius:6px;margin-bottom:8px;padding-bottom:9px;padding-right:7px}
+.roster-entry .roster-row{margin-bottom:0}
+.roster-row[class*="group-"]:hover,.roster-row[class*="group-"].selected{border-color:var(--group-color);box-shadow:inset 0 0 0 1px var(--group-color)}
+.roster-row[class*="group-"] .roster-number{color:#101820;background:var(--group-color);border-color:var(--group-color)}
+.roster-detail .group-badge{margin-top:6px;padding:2px 5px;border:0}
+.number-marker[class*="group-"]>span{background:var(--group-color);color:#101820}
+.number-marker.approximate>span{border-style:dashed}
+.number-marker.stale>span{border-color:#52616d;box-shadow:0 0 0 2px #fff,0 2px 7px #0008}
+.map-legend .marker-key{flex-basis:100%;font-size:10px;line-height:1.6}
+.leaflet-popup-content .group-badge{margin:5px 0}
+@media(max-width:380px){.group-option>span{font-size:11px;gap:4px}.group-options{gap:5px}}

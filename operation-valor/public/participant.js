@@ -1,5 +1,6 @@
 import { acquirePosition } from './acquire.mjs';
 import { api, numberLabel, accuracyLabel, timeLabel, setMessage } from './shared.mjs';
+import { GROUPS, groupInfo } from './groups.mjs';
 
 const $ = id => document.getElementById(id);
 let session;
@@ -15,13 +16,24 @@ function render() {
   $('exerciseStatus').textContent = active ? 'Exercise active' : session.status === 'ended' ? 'Exercise ended' : 'Stand by';
   $('exerciseStatus').className = `badge ${active ? 'active' : ''}`;
   $('connectionStatus').textContent = navigator.onLine ? (active ? 'Ready for check-ins' : 'Waiting for the controller') : 'No connection';
-  $('joinCard').hidden = !active || !!session.participant;
-  $('checkinCard').hidden = !session.participant;
+  const needsGroup = session.participant && !GROUPS.includes(session.participant.group);
+  $('joinCard').hidden = !active || (!!session.participant && !needsGroup);
+  $('checkinCard').hidden = !session.participant || (active && needsGroup);
+  $('codeName').readOnly = !!needsGroup;
+  if (needsGroup) $('codeName').value = session.participant.name;
+  $('joinTitle').textContent = needsGroup ? 'Choose your group.' : 'Choose your code name and group.';
+  $('joinDescription').textContent = needsGroup ? 'Select your assigned group. Your number and latest check-in will stay the same.' : 'Use the name and group assigned for this exercise. Your number stays with you in this browser. Your check-ins will be visible to everyone who joins the exercise.';
+  $('joinLabel').textContent = needsGroup ? 'Save group' : 'Join exercise';
+  $('groupChoices').disabled = busy;
   $('sendLocation').disabled = !active || busy || !navigator.onLine;
   $('joinButton').disabled = !active || busy || !navigator.onLine;
   if (session.participant) {
     $('participantName').textContent = session.participant.name;
     $('participantNumber').textContent = numberLabel(session.participant.number);
+    const group = groupInfo(session.participant.group);
+    $('participantGroup').textContent = group.name;
+    $('participantGroup').className = `group-badge ${group.className}`;
+    $('checkinCard').className = `card checkin-card ${group.className}`;
     const ping = session.participant.ping;
     $('receipt').hidden = !ping;
     if (ping) {
@@ -54,10 +66,12 @@ async function refresh() {
 
 $('joinForm').addEventListener('submit', async event => {
   event.preventDefault(); if (busy) return;
+  const group = new FormData($('joinForm')).get('group');
+  const updating = !!session?.participant;
   busy = true; render();
   try {
-    session = await api('/api/join', { name: $('codeName').value });
-    setMessage('You are on the roster. Tap the button when you are ready to share your position.');
+    session = await api('/api/join', { name: $('codeName').value, group });
+    setMessage(updating ? 'Group saved. Your number and latest check-in are unchanged.' : 'You are on the roster. Tap the button when you are ready to share your position.');
   } catch (error) { setMessage(error.message, 'error'); }
   finally { busy = false; render(); }
 });

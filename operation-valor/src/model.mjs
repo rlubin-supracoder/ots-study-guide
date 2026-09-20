@@ -1,3 +1,5 @@
+import { GROUPS } from '../public/groups.mjs';
+
 export const MAX_PARTICIPANTS = 100;
 export const TARGET_ACCURACY = 5;
 export const RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -41,19 +43,22 @@ export function initialState() {
 export function publicParticipant(person) {
   if (!person) return null;
   const { number, name, joinedAt, ping, pingCount } = person;
-  return { number, name, joinedAt, ping, pingCount };
+  return { number, name, group: GROUPS.includes(person.group) ? person.group : null, joinedAt, ping, pingCount };
 }
 
-export function register(state, name, tokenHash, now) {
+export function register(state, name, tokenHash, now, group) {
   if (state.status !== 'active') throw new AppError('The controller has not opened this exercise.', 409);
   const existing = state.participants.find(p => p.tokenHash === tokenHash);
-  if (existing) return existing;
+  if (existing && GROUPS.includes(existing.group)) return existing;
+  if (!GROUPS.includes(group)) throw new AppError('Choose Alpha, Bravo, or Charlie as your group.');
+  // Participants from before groups were added keep their number and latest check-in.
+  if (existing) { existing.group = group; return existing; }
   const cleaned = codeName(name);
   if (state.participants.some(p => p.name.toLowerCase() === cleaned.toLowerCase())) {
     throw new AppError('That code name is already assigned. Use your original browser or choose another name.', 409);
   }
   if (state.participants.length >= MAX_PARTICIPANTS) throw new AppError('This exercise has reached its participant limit.', 409);
-  const person = { number: state.nextNumber++, name: cleaned, tokenHash, joinedAt: now, ping: null, pingCount: 0 };
+  const person = { number: state.nextNumber++, name: cleaned, group, tokenHash, joinedAt: now, ping: null, pingCount: 0 };
   state.participants.push(person);
   return person;
 }

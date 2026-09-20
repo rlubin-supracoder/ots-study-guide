@@ -146,7 +146,7 @@ export class ValorExercise extends DurableObject {
         const body = await request.json();
         if (path === '/api/join') {
           if (!hash) throw new AppError('Could not create a participant session.', 401);
-          const joined = register(this.state, body.name, hash, now);
+          const joined = register(this.state, body.name, hash, now, body.group);
           await this.save(); this.broadcast();
           return json({ exerciseId: this.state.exerciseId, status: this.state.status, participant: publicParticipant(joined) });
         }

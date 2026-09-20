@@ -14,7 +14,7 @@ Operation Valor is a shared location check-in tool for the OTS land navigation e
 ## The exercise from start to finish
 
 1. The admin opens **Exercise control** and selects **Start exercise**. Until then, participants see a standby message and cannot join.
-2. Participants open the check-in page, enter their assigned code names, and select **Join exercise**. Joining puts them on the roster and gives each person a number. It does **not** ask for or send a location.
+2. Participants open the check-in page, enter their assigned code names, choose Alpha (blue), Bravo (orange), or Charlie (purple), and select **Join exercise**. Joining puts them on the roster and gives each person a number. It does **not** ask for or send a location.
 3. When a participant is ready, they select **Send my location** and allow the browser to use their location. The page looks for a fresh position, then sends one check-in. They can do this again later to replace their previous position.
 4. Joined participants can open the shared map. The admin sees the same positions on the control page, along with the roster and exercise controls. Both maps update as check-ins arrive.
 5. The admin selects **End exercise** to stop new joins and check-ins. The existing roster and map stay available until the admin clears them or the 24-hour limit is reached.
@@ -24,7 +24,7 @@ Operation Valor is a shared location check-in tool for the OTS land navigation e
 
 ## Joining and getting a number
 
-Use the code name assigned for the exercise. Names can be 1–24 characters and use letters, numbers, spaces, hyphens, or underscores. Two people cannot use the same code name in one exercise, even if they change the capitalization. The roster holds up to 100 participants at one time.
+Use the code name and group assigned for the exercise. Returning participants who joined before groups were added can choose a group without changing their number or latest check-in. Names can be 1–24 characters and use letters, numbers, spaces, hyphens, or underscores. Two people cannot use the same code name in one exercise, even if they change the capitalization. The roster holds up to 100 participants at one time.
 
 Your number stays the same while you remain in the exercise and use the same browser session. The site saves a private cookie in that browser so it can recognize you when you return. If you switch browsers or devices, it may treat you as a new participant. If you are already on the roster and try to join from another browser with the same code name, it will tell you that the name is taken.
 
@@ -45,6 +45,10 @@ Only the **latest** successful check-in for each person is kept. Sending another
 ## Reading the map and roster
 
 The map and roster show everyone who has joined, including people who have not checked in yet. A person gets a map marker only after a successful check-in. You can search the roster by code name or number, select a person to focus on their marker, or use **Show all** to fit all current markers on the map.
+
+Use **Filter list by group** to show Alpha, Bravo, or Charlie in the participant list. The group filter works together with the code name/number search; the map and exercise totals continue to include everyone. Participants without a group appear as **Unassigned** until they choose one on the check-in page.
+
+Group colors are consistent across marker fills, participant rows, and identity badges: **Alpha is blue, Bravo is orange, and Charlie is purple**. Approximate markers have a dashed border; stale markers have a gray border. Group names and location status also appear as text.
 
 Each marker has a number. Selecting it shows the code name, coordinates, reported accuracy, and the time the phone captured the position. The circle around the marker shows the phone's **estimated** accuracy. It is a helpful visual guide, not a guaranteed boundary.
 

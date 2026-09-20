@@ -1,4 +1,5 @@
 import { api, numberLabel, accuracyLabel, ageLabel, timeLabel, setMessage } from './shared.mjs';
+import { groupInfo } from './groups.mjs';
 
 const $ = id => document.getElementById(id);
 const participantView = document.body.dataset.view === 'participant';
@@ -30,11 +31,15 @@ function popup(person) {
   const title = document.createElement('strong');
   title.textContent = `${numberLabel(person.number)} — ${person.name}`;
   wrapper.append(title, document.createElement('br'));
+  const group = document.createElement('span');
+  group.className = `group-badge ${groupInfo(person.group).className}`;
+  group.textContent = groupInfo(person.group).name;
+  wrapper.append(group, document.createElement('br'));
   const detail = document.createElement('span');
   detail.textContent = `${person.ping.latitude.toFixed(6)}, ${person.ping.longitude.toFixed(6)}`;
   wrapper.append(detail, document.createElement('br'));
   const time = document.createElement('small');
-  time.textContent = `${accuracyLabel(person.ping.accuracy)} estimate · captured ${timeLabel(person.ping.capturedAt)}`;
+  time.textContent = `${accuracyLabel(person.ping.accuracy)} estimate · captured ${timeLabel(person.ping.capturedAt)}${person.ping.quality === 'approximate' ? ' · approximate' : ''}${style(person) === 'stale' ? ' · stale' : ''}`;
   wrapper.append(time);
   return wrapper;
 }
@@ -48,6 +53,7 @@ function renderMap(people) {
   }
   for (const person of located) {
     const color = style(person);
+    const group = groupInfo(person.group);
     const latlng = [person.ping.latitude, person.ping.longitude];
     let record = markers.get(person.number);
     if (!record) {
@@ -57,11 +63,14 @@ function renderMap(people) {
       record = { marker, circle };
       markers.set(person.number, record);
     }
-    const signature = `${person.ping.requestId}:${color}`;
+    const signature = `${person.ping.requestId}:${color}:${group.name}`;
     if (record.signature !== signature) {
-      record.marker.setLatLng(latlng).setIcon(L.divIcon({ className: `number-marker ${color}`, html: `<span>${numberLabel(person.number)}</span>`, iconSize: [32, 32], iconAnchor: [16, 16] }));
+      record.marker.setLatLng(latlng).setIcon(L.divIcon({ className: `number-marker ${color} ${group.className}`, html: `<span>${numberLabel(person.number)}</span>`, iconSize: [32, 32], iconAnchor: [16, 16] }));
+      const label = `${numberLabel(person.number)} — ${person.name}, ${group.name}${color === 'stale' ? ', stale' : color === 'approximate' ? ', approximate' : ''}`;
+      record.marker.getElement()?.setAttribute('aria-label', label);
+      record.marker.getElement()?.setAttribute('title', label);
       record.marker.bindPopup(popup(person));
-      record.circle.setLatLng(latlng).setRadius(person.ping.accuracy).setStyle({ color: color === 'good' ? '#36a67e' : color === 'approximate' ? '#c78c24' : '#718798' });
+      record.circle.setLatLng(latlng).setRadius(person.ping.accuracy).setStyle({ color: group.color, dashArray: color === 'good' ? null : '4 4' });
       record.signature = signature;
     }
   }
@@ -76,18 +85,27 @@ function fitMap() {
 function renderRoster() {
   if (!snapshot) return;
   const search = $('rosterSearch').value.toLowerCase().trim();
-  const people = snapshot.participants.filter(person => !search || `${numberLabel(person.number)} ${person.name}`.toLowerCase().includes(search));
+  const groupFilter = $('groupFilter').value;
+  $('unassignedOption').hidden = !snapshot.participants.some(person => !person.group) && groupFilter !== 'Unassigned';
+  const people = snapshot.participants.filter(person =>
+    (!groupFilter || groupInfo(person.group).name === groupFilter) &&
+    (!search || `${numberLabel(person.number)} ${person.name}`.toLowerCase().includes(search)));
+  $('rosterCount').textContent = groupFilter || search ? `${people.length} / ${snapshot.participants.length}` : people.length;
+  $('rosterCount').setAttribute('aria-label', `${people.length} of ${snapshot.participants.length} participants shown`);
+  $('filterSummary').textContent = groupFilter || search ? `Showing ${people.length} of ${snapshot.participants.length}. Map shows all groups.` : 'Map and list show all groups.';
   const fragment = document.createDocumentFragment();
   for (const person of people) {
+    const group = groupInfo(person.group);
     const row = document.createElement('button');
-    row.type = 'button'; row.className = `roster-row ${style(person)} ${person.number === selected ? 'selected' : ''}`;
-    row.setAttribute('aria-label', `${numberLabel(person.number)} ${person.name}${person.ping ? ', show position' : ', awaiting first check-in'}`);
+    row.type = 'button'; row.className = `roster-row ${style(person)} ${group.className} ${person.number === selected ? 'selected' : ''}`;
+    row.setAttribute('aria-label', `${numberLabel(person.number)} ${person.name}, ${group.name}${person.ping ? ', show position' : ', awaiting first check-in'}`);
     const number = document.createElement('span'); number.className = 'roster-number'; number.textContent = numberLabel(person.number);
     const detail = document.createElement('span'); detail.className = 'roster-detail';
     const name = document.createElement('strong'); name.textContent = person.name;
+    const groupLabel = document.createElement('span'); groupLabel.className = `group-badge ${group.className}`; groupLabel.textContent = group.name;
     const status = document.createElement('small');
-    status.textContent = person.ping ? `${ageLabel(person.ping.capturedAt)} · ${accuracyLabel(person.ping.accuracy)} estimate${person.ping.quality === 'approximate' ? ' · approximate' : ''}` : 'Awaiting first check-in';
-    detail.append(name, status);
+    status.textContent = person.ping ? `${ageLabel(person.ping.capturedAt)} · ${accuracyLabel(person.ping.accuracy)} estimate${person.ping.quality === 'approximate' ? ' · approximate' : ''}${style(person) === 'stale' ? ' · stale' : ''}` : 'Awaiting first check-in';
+    detail.append(name, groupLabel, status);
     if (person.ping) {
       const coordinates = document.createElement('small'); coordinates.className = 'coordinates';
       coordinates.textContent = `${person.ping.latitude.toFixed(6)}, ${person.ping.longitude.toFixed(6)}`;
@@ -102,7 +120,7 @@ function renderRoster() {
     });
     if (participantView) fragment.append(row);
     else {
-      const entry = document.createElement('div'); entry.className = 'roster-entry';
+      const entry = document.createElement('div'); entry.className = `roster-entry ${group.className}`;
       const remove = document.createElement('button');
       remove.type = 'button'; remove.className = 'remove-participant'; remove.textContent = 'Remove';
       remove.disabled = busy;
@@ -114,7 +132,7 @@ function renderRoster() {
       entry.append(row, remove); fragment.append(entry);
     }
   }
-  if (!people.length) { const empty = document.createElement('p'); empty.className = 'empty-roster'; empty.textContent = search ? 'No matching participants.' : 'Participants appear here when they join the exercise.'; fragment.append(empty); }
+  if (!people.length) { const empty = document.createElement('p'); empty.className = 'empty-roster'; empty.textContent = search || groupFilter ? 'No participants match this group and search.' : 'Participants appear here when they join the exercise.'; fragment.append(empty); }
   $('roster').replaceChildren(fragment);
 }
 
@@ -206,6 +224,7 @@ $('confirmAction')?.addEventListener('close', async () => {
 });
 $('fitMap').addEventListener('click', fitMap);
 $('rosterSearch').addEventListener('input', renderRoster);
+$('groupFilter').addEventListener('change', renderRoster);
 setInterval(() => { if (!document.hidden && snapshot) render(); }, 10_000);
 setInterval(() => { if (socket?.readyState === WebSocket.OPEN) socket.send('ping'); else if (!signedOut) refresh(); }, 30_000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !signedOut) refresh(); });
