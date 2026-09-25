@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f"><meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Tether">
+  <title>Tether · OTS Accountability</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to accountability</a>
+  <header class="masthead"><a href="/" class="brand" aria-label="Tether home"><img src="/icon.svg" width="42" height="42" alt=""><span>TETHER<small>OTS ACCOUNTABILITY</small></span></a><span class="base-label">MAXWELL AFB<br><strong>Stay connected.</strong></span></header>
+  <nav aria-label="Main navigation" class="nav"><button data-view="home" aria-current="page">Status</button><button data-view="profile">Profile</button><button data-view="history">My history</button><button data-view="admin" id="adminNav" hidden>Staff</button><a href="/cdn-cgi/access/logout" id="logout">Log out</a></nav>
+  <main id="main" tabindex="-1">
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <div id="authError" class="panel" hidden><h1>Sign-in required</h1><p>Your session ended or your access changed. Sign in again to continue.</p><a class="button" href="/">Sign in</a></div>
+    <section id="home" class="view">
+      <div class="section-label"><span>YOUR ACCOUNTABILITY</span><span id="sync" role="status">Connecting…</span></div>
+      <article id="personal" class="personal panel" aria-busy="true"><p>Loading your verified status…</p></article>
+      <div class="roster-heading"><h1>CURRENTLY OFF CAMPUS <span id="count" class="count">—</span></h1><p>Updates automatically · All times Central</p></div>
+      <div id="roster" class="roster" aria-label="Current off-campus roster"></div>
+      <p class="privacy-note">Destinations are shared with approved members. No GPS tracking.</p>
+    </section>
+    <section id="profile" class="view" hidden><div class="page-heading"><p class="eyebrow">YOUR DETAILS</p><h1>Ready when you are.</h1><p>Set up once. Update whenever your details change.</p></div>
+      <form id="profileForm" class="panel form-stack"><label>Full name<input name="full_name" autocomplete="name" maxlength="100" minlength="2" required></label><div class="form-grid"><label>Flight number<input name="flight_number" autocomplete="off" maxlength="20" required></label><label>Room number<input name="room_number" autocomplete="off" maxlength="20" required></label></div><label>U.S. phone number<input name="phone_number" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="22" required placeholder="(334) 555-0123"></label><p class="hint">Your phone number is available to authorized staff for accountability. Name, flight, room and destination appear on the approved-member roster while you are out.</p><button type="submit" class="button primary">Save profile</button></form>
+    </section>
+    <section id="history" class="view" hidden><div class="page-heading"><p class="eyebrow">YOUR RECORD</p><h1>Checkout history</h1><p>Departures and returns, in Central Time.</p></div><div id="myHistory"></div><button id="moreHistory" class="button" hidden>Load more trips</button></section>
+    <section id="admin" class="view" hidden><div class="page-heading"><p class="eyebrow">STAFF ACCOUNTABILITY</p><h1>The full picture.</h1><p>Corrections are recorded with your identity, time and reason.</p></div><div id="stats" class="stats"></div>
+      <div class="subnav" aria-label="Staff views"><button data-staff="records" aria-pressed="true">Records</button><button data-staff="users" aria-pressed="false">Members</button><button data-staff="audit" aria-pressed="false">Audit trail</button></div>
+      <div id="staffRecords"><form id="filterForm" class="panel filters"><label>Search<input name="search" type="search" maxlength="100" placeholder="Name, destination, room"></label><label>Flight<input name="flight" maxlength="20" placeholder="All flights"></label><label>Status<select name="status"><option value="">All records</option><option value="ACTIVE">Off campus</option><option value="OVERDUE">Overdue</option><option value="COMPLETED">Checked in</option><option value="ADMIN_CLOSED">Staff closed</option></select></label><label>From date<input name="from" type="date"></label><label>Through date<input name="through" type="date"></label><button class="button" type="submit">Apply filters</button><button class="text-button" id="resetFilters" type="button">Reset</button></form><p id="memberFilter" hidden></p><div id="adminHistory"></div><button id="moreAdminHistory" class="button" hidden>Load more records</button></div>
+      <div id="staffUsers" hidden><form id="inviteForm" class="panel form-stack"><h2>Approve a member</h2><label>Email address<input name="email" type="email" autocomplete="off" maxlength="254" required></label><p class="hint">Approve their exact sign-in email, then share the Tether address with them. Tether does not send an invitation email.</p><button type="submit" class="button primary">Approve email</button></form><div id="usersList"></div></div>
+      <div id="staffAudit" hidden><p class="hint">Audit entries are retained when records are corrected.</p><div id="auditList"></div><button id="moreAudit" class="button" hidden>Load more events</button></div>
+    </section>
+  </main>
+  <footer><span>TETHER</span><span>Accountability, simplified.<br>America/Chicago</span></footer>
+  <dialog id="dialog" aria-labelledby="dialogTitle"><div class="dialog-heading"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-button" aria-label="Close dialog">✕</button></div><div id="dialogBody"></div><p id="dialogError" class="error" role="alert" hidden></p></dialog>
+  <noscript><p class="notice">Enable JavaScript to check in and out securely.</p></noscript>
+</body></html>

@@ -8,3 +8,4 @@ reference.html
 .wrangler/
 .dev.vars*
 .env*
+!.env.example
