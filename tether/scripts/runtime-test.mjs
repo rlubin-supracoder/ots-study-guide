@@ -6,7 +6,7 @@ const require=createRequire(import.meta.url),wranglerRequire=createRequire(requi
 const {Miniflare,convertV4MiniflareOptions}=wranglerRequire('miniflare');
 const root=path.resolve('dist'),sql=(await readdir(root)).filter(f=>f.endsWith('.sql'));
 const persist=path.resolve('.wrangler','runtime-test-'+crypto.randomUUID());
-const options={name:'tether-runtime-test',compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',MEMBER_PASSWORD:'runtime-password',APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
+const options={name:'tether-runtime-test',compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
 const runtimeOptions={...convertV4MiniflareOptions(options),resourcePersistencePath:persist,telemetry:{enabled:false}};
 let mf=new Miniflare(runtimeOptions);
 async function client(){const ns=await mf.getDurableObjectNamespace('ACCOUNTABILITY');return ns.get(ns.idFromName('tether-accountability-v1'));}
@@ -19,6 +19,7 @@ const action=(email,action,data,request_id=crypto.randomUUID())=>call(email,'/ap
 try{
   assert.equal((await mf.dispatchFetch('https://tether.test/api/state')).status,401);
   assert.equal((await call('unapproved@example.test','/api/state')).status,403);
+  assert.equal((await call('second@example.test','/api/state')).data.user.role,'admin');
   let state=(await call('staff@example.test','/api/state')).data;
   assert.equal(state.user.role,'admin');
   assert.equal((await action('staff@example.test','profile',{version:state.user.version,full_name:'Runtime Staff',flight_number:'27-01',room_number:'101',phone_number:'3345550123'})).status,200);
@@ -30,6 +31,7 @@ try{
   const active=(await call('staff@example.test','/api/state')).data.active;
   await mf.dispose();mf=new Miniflare(runtimeOptions);stub=await client();
   assert.equal((await call('staff@example.test','/api/state')).data.active.id,active.id);
+  assert.equal((await call('second@example.test','/api/admin/users',{})).data.users.filter(user=>user.email==='second@example.test').length,1);
   assert.equal((await action('staff@example.test','checkin',{record_id:active.id})).status,200);
   const history=await call('staff@example.test','/api/history',{});
   assert.equal(history.data.records[0].status,'COMPLETED');

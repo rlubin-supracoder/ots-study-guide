@@ -20,6 +20,21 @@ export class Database {
   }
   rows(query, ...params) { return Array.from(this.sql.exec(query, ...params)); }
   one(query, ...params) { return this.rows(query, ...params)[0]; }
+  provisionStaff(addresses) {
+    const approved=[...new Set(addresses.map(email))];
+    this.storage.transactionSync(()=>{
+      for(const address of approved) {
+        const key='staff-provisioned:'+address;
+        if(this.one('SELECT value FROM metadata WHERE key=?',key))continue;
+        const existing=this.one('SELECT * FROM users WHERE email=? COLLATE NOCASE',address);
+        const userId=existing?.id||crypto.randomUUID(),now=this.clock();
+        if(!existing)this.sql.exec("INSERT INTO users(id,email,role,created_at,updated_at) VALUES (?,?,'admin',?,?)",userId,address,now,now);
+        else if(existing.role!=='admin')this.sql.exec("UPDATE users SET role='admin',version=version+1,updated_at=? WHERE id=?",now,userId);
+        this.audit(null,userId,null,'STAFF_APPROVED',{source:'deployment configuration',previous_role:existing?.role||null},now);
+        this.sql.exec('INSERT INTO metadata VALUES (?,?)',key,'1');
+      }
+    });
+  }
   authorize(identity) {
     const member=typeof identity==='object'&&identity!==null;
     const user = member?this.one('SELECT * FROM users WHERE id=?',id(identity.userId)):this.one('SELECT * FROM users WHERE email=? COLLATE NOCASE', email(identity));

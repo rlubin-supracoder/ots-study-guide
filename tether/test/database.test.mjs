@@ -24,6 +24,13 @@ test('required profile and invalid phone, script, excessive fields are rejected'
   for(const patch of [{phone_number:'123'},{full_name:'<script>alert(1)</script>'},{room_number:'A'.repeat(21)},{flight_number:''}])assert.throws(()=>f.send('member@example.test','profile',{full_name:'Test Person',flight_number:'1',room_number:'2',phone_number:'3345550123',version:1,...patch}));
   f.setup('member@example.test');assert.equal(f.db.authorize('member@example.test').phone_number,'(334) 555-0123');
 });
+test('staff provisioning is audited once and preserves existing profiles, trips and disabled access',()=>{
+  const f=fixture();f.invite('second@example.test');f.setup('second@example.test');const trip=f.checkout('second@example.test');
+  const before=f.db.authorize('second@example.test');f.db.provisionStaff(['second@example.test']);
+  const after=f.db.authorize('second@example.test');assert.equal(after.id,before.id);assert.equal(after.full_name,before.full_name);assert.equal(after.role,'admin');assert.equal(f.db.state(after).active.id,trip.record_id);
+  f.db.provisionStaff(['SECOND@example.test']);assert.equal(f.db.one("SELECT COUNT(*) n FROM audit WHERE action='STAFF_APPROVED'").n,1);
+  f.db.sql.exec('UPDATE users SET enabled=0 WHERE id=?',after.id);f.db.provisionStaff(['second@example.test']);assert.throws(()=>f.db.authorize('second@example.test'),/disabled/);
+});
 test('checkout, duplicate protection, checkin, history and audit persist',()=>{
   const f=fixture();f.invite('member@example.test');f.setup('member@example.test');const user=()=>f.db.authorize('member@example.test');
   const result=f.checkout(user().email);assert.equal(f.db.state(user()).roster.length,1);assert.equal(f.db.state(user()).active.checked_out_at,'2026-09-25T17:00:00.000Z');assert.throws(()=>f.checkout(user().email),/already checked out/);

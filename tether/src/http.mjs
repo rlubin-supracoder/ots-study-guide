@@ -1,4 +1,4 @@
-import { identity,csrf,bodyOf,cookieToken,digest } from './auth.mjs';
+import { identity,csrf,bodyOf,cookieToken,digest,isStaffEmail } from './auth.mjs';
 import { AppError } from './validation.mjs';
 export const securityHeaders={
   'Cache-Control':'no-store, max-age=0',
@@ -29,7 +29,7 @@ export async function serveRequest(request,env,authenticate=identity) {
     let actor;
     if(staff) {
       actor=await authenticate(request,env);
-      if(!env.BOOTSTRAP_ADMIN_EMAIL||actor.email!==env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase())throw new AppError('This staff page is restricted to the designated administrator.',403);
+      if(!isStaffEmail(actor.email,env))throw new AppError('This staff page is restricted to approved administrators.',403);
     }
     const stub=env.ACCOUNTABILITY.get(env.ACCOUNTABILITY.idFromName('tether-accountability-v1'));
     const path=staff?url.pathname.slice('/staff'.length)||'/':url.pathname;

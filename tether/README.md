@@ -20,7 +20,7 @@ Use the phone browser's **Add to Home Screen** option. The manifest supports sta
 
 ## Staff workflow
 
-Open **/staff** and use the designated administrator's email-code sign-in. Staff do not need the campus password.
+Open **/staff** and use an approved staff email for email-code sign-in. Staff do not need the campus password. New staff complete their own profile before checking out; staff tools are available immediately.
 
 - **Members → Connection code** reconnects an existing profile. **Reset existing devices** revokes that member's device sessions and outstanding codes before creating a replacement code. A reason is required.
 - **Manage access** enables/disables a member. Close active trips before disabling access. Historical records remain intact.
@@ -37,7 +37,7 @@ A separate Cloudflare Worker and SQLite Durable Object follow the root website a
 
 **Member authentication:** the Worker verifies MEMBER_PASSWORD server-side, issues a random 256-bit gate token and a separate random 256-bit device token, and stores only token hashes. Cookies use the __Host- prefix, Secure, HttpOnly, SameSite=Strict and Path=/. The database checks password version, session expiry and enabled user on every private request. Device authorization is always capped to Member, even for an underlying administrator profile. Setup cannot select or claim another member by name. Connection codes use 128 random bits, are stored hashed, are one-use, and expire after 24 hours. Lost-response retries are supported on the same gate.
 
-**Staff authentication:** Cloudflare Access protects /staff and its subpaths, including /staff/api/*. Its allow policy names only the designated administrator email. The Worker independently validates the Access JWT signature, issuer, audience, expiry, subject and email, then checks the designated email and database administrator role. Email verification alone is not two-factor authentication. Member routes cannot grant staff authority. Access sessions last 24 hours with Secure/HttpOnly cookies.
+**Staff authentication:** Cloudflare Access protects /staff and its subpaths, including /staff/api/*. Its allow policy names only approved staff emails. The Worker independently validates the Access JWT signature, issuer, audience, expiry, subject and email, then checks its own approved email list and an enabled database administrator role. The original bootstrap administrator remains included alongside STAFF_EMAILS. Newly configured staff accounts are created or promoted once with a STAFF_APPROVED audit event; subsequent deployments do not re-enable disabled accounts or overwrite profiles and history. Email verification alone is not two-factor authentication. Member routes cannot grant staff authority. Access sessions last 24 hours with Secure/HttpOnly cookies.
 
 Sensitive operations enforce server authorization. Writes require the exact Origin, a custom request header and JSON; bodies are limited to 8 KiB. Persisted limits allow 60 login/setup attempts per source IP per 15 minutes (1,500 globally), 30 user mutations/minute and 180 reads/minute. IP addresses are hashed before storage. Public files contain generic interface code and graphics, not the password or personnel data.
 
@@ -80,16 +80,17 @@ Use Node.js 24 and pnpm 11 from tether/:
 | APP_ORIGIN | Exact HTTPS origin; Wrangler variable |
 | ACCESS_TEAM_DOMAIN | Existing Access issuer; Wrangler variable |
 | ACCESS_AUD | Tether staff Access audience; Wrangler variable |
-| BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial bootstrap email and exact authorized staff email |
+| BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial administrator, always included in the staff email list |
+| STAFF_EMAILS | Worker secret: comma-separated additional approved staff emails |
 | MEMBER_PASSWORD | Worker secret: shared campus password |
-| TETHER_STAFF_EMAIL | Local setup script's designated email; must match bootstrap secret |
+| TETHER_STAFF_EMAILS | Local setup script's complete staff list: bootstrap plus additional emails |
 | CLOUDFLARE_ACCOUNT_ID | Account for token-based deployment |
 | CLOUDFLARE_API_TOKEN | Optional deployment token instead of Wrangler OAuth |
 | CLOUDFLARE_ACCESS_TOKEN_FILE | Local temporary Access setup token file |
 
 Set secrets with **pnpm exec wrangler secret put MEMBER_PASSWORD** and **pnpm exec wrangler secret put BOOTSTRAP_ADMIN_EMAIL**; enter values interactively. Password rotation invalidates gate sessions while retaining profile connections. Never commit secrets or put the password in public assets.
 
-Preserve the existing Tether Access app and audience. **node scripts/configure-access.mjs** reviews the planned scope; add **--apply** to restrict its policy to TETHER_STAFF_EMAIL and move it to /staff. It needs a temporary account-scoped token with **Access: Apps and Policies — Edit**. It refuses unexpected configurations. When migrating from whole-site Access, deploy the password-protected Worker and set its password secret **before** applying the Access change. Delete the local token and revoke/expire it afterward.
+Preserve the existing Tether Access app and audience. **node scripts/configure-access.mjs** reviews the planned scope; add **--apply** to set its policy to the complete TETHER_STAFF_EMAILS list at /staff. It needs a temporary account-scoped token with **Access: Apps and Policies — Edit**. It refuses unexpected configurations. When migrating from whole-site Access, deploy the password-protected Worker and set its password secret **before** applying the Access change. Delete the local token and revoke/expire it afterward.
 
 GitHub CI runs tests/build/runtime checks without deployment credentials. Deploy with authorized Wrangler credentials. Never commit .dev.vars, .env, database exports or .wrangler state. NODE_USE_SYSTEM_CA=1 may be needed for a corporate CA; never disable TLS verification.
 
@@ -99,7 +100,9 @@ Only **tether.russelllubinski.us** belongs to this Worker. Cloudflare manages DN
 
 001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type without replacing profiles or trips. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
 
-The staff route is restricted to one designated email. A database promotion alone does not authorize another email. To transfer administration, arrange an enabled administrator record with an audited migration, update BOOTSTRAP_ADMIN_EMAIL, and update the Access email policy together. Changing the bootstrap secret alone does not replace the existing database account. Members cannot promote themselves.
+To add staff, preserve existing additional addresses and update the STAFF_EMAILS Worker secret with **pnpm exec wrangler secret put STAFF_EMAILS**. Deploy or activate the updated configuration; the Durable Object creates/promotes each newly configured staff account once, preserving existing records and adding an audit event. Set TETHER_STAFF_EMAILS to the complete list, including BOOTSTRAP_ADMIN_EMAIL, and apply the Access configuration script. Verify the account in **Staff → Members**. No mailbox address belongs in public source. A database promotion alone does not grant staff access, and members cannot promote themselves.
+
+To revoke staff access, remove the email from both the Worker secret and Access policy, then disable its account if all member access should also end. Existing JWTs are denied immediately by the Worker's email check after configuration propagation. Disabled accounts remain disabled across deployments and must be deliberately enabled in **Manage access**. Preserve the original administrator unless an administration transfer is explicitly intended.
 
 Correct individual errors through **Staff → Records → Correct record**; retain the reason and audit. Use **Connection code → Reset existing devices** for a lost phone.
 

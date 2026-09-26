@@ -4,15 +4,16 @@ import {generateKeyPair,SignJWT,createLocalJWKSet,exportJWK} from 'jose';
 import {fixture} from './helpers.mjs';
 import {serveRequest} from '../src/http.mjs';
 import {databaseRequest} from '../src/service.mjs';
-import {verifyToken} from '../src/auth.mjs';
+import {verifyToken,staffEmails} from '../src/auth.mjs';
 const {privateKey,publicKey}=await generateKeyPair('RS256');
 const keys=createLocalJWKSet({keys:[{...await exportJWK(publicKey),kid:'test',alg:'RS256'}]});
 const envBase={APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test-audience',BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',MEMBER_PASSWORD:'test-campus-password'};
 const profile={full_name:'Test Member',flight_number:'27-01',room_number:'102',phone_number:'3345550123'};
 async function token(email='staff@example.test',options={}){return new SignJWT({email}).setProtectedHeader({alg:'RS256',kid:'test'}).setSubject('test-user').setIssuedAt().setIssuer('https://test.cloudflareaccess.com').setAudience(options.audience||'test-audience').setExpirationTime(options.exp||'5m').sign(privateKey);}
 const cookie=r=>r.headers.get('Set-Cookie')?.split(';')[0];
-function harness(){
-  const f=fixture();const env={...envBase,ACCOUNTABILITY:{idFromName:v=>v,get:()=>({fetch:r=>databaseRequest(f.db,r,env)})},ASSETS:{fetch:async r=>new Response(new URL(r.url).pathname)}};
+function harness(overrides={}){
+  const f=fixture();const env={...envBase,...overrides,ACCOUNTABILITY:{idFromName:v=>v,get:()=>({fetch:r=>databaseRequest(f.db,r,env)})},ASSETS:{fetch:async r=>new Response(new URL(r.url).pathname)}};
+  f.db.provisionStaff(staffEmails(env));
   const request=async(path,body,headers={})=>serveRequest(new Request(env.APP_ORIGIN+path,{method:body===undefined?'GET':'POST',headers:{...(body!==undefined?{'Content-Type':'application/json',Origin:env.APP_ORIGIN,'X-Tether-Request':'1'}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body)}),env,(r,e)=>verifyToken(r.headers.get('Cf-Access-Jwt-Assertion'),e,keys));
   const unlock=async()=>{const r=await request('/api/unlock',{password:env.MEMBER_PASSWORD});assert.equal(r.status,200);return cookie(r);};
   const join=async(data=profile)=>{const gate=await unlock(),r=await request('/api/join',data,{Cookie:gate});assert.equal(r.status,200);return gate+'; '+cookie(r);};
@@ -28,6 +29,29 @@ test('staff requires a valid JWT for the designated email; forged member headers
   assert.equal((await h.request('/staff',undefined,{'Cf-Access-Jwt-Assertion':await token('stranger@example.test')})).status,403);
   assert.equal((await h.request('/api/state',undefined,{'X-Tether-Mode':'staff','X-Verified-Email':'staff@example.test','Cf-Access-Jwt-Assertion':await token()})).status,401);
   assert.equal((await h.staffRequest('/api/admin/users',{})).status,200);
+});
+test('additional approved staff can use admin APIs while original staff and member boundaries remain intact',async()=>{
+  const h=harness({STAFF_EMAILS:' Second@Example.Test , second@example.test, STAFF@example.test '});
+  assert.deepEqual(staffEmails(h.env),['staff@example.test','second@example.test']);
+  const headers={'Cf-Access-Jwt-Assertion':await token('second@example.test')};
+  const r=await h.request('/staff/api/state',undefined,headers);assert.equal(r.status,200);
+  const state=await r.json();assert.equal(state.user.role,'admin');assert.equal(state.profile_complete,false);
+  assert.equal((await h.request('/staff/api/admin/users',{},headers)).status,200);
+  assert.equal((await h.staffRequest('/api/admin/users',{})).status,200);
+  assert.equal((await h.request('/staff/api/admin/users',{}, {'Cf-Access-Jwt-Assertion':await token('outsider@example.test')})).status,403);
+  assert.equal((await h.request('/api/admin/users',{},headers)).status,401);
+  h.db.sql.exec('UPDATE users SET enabled=0 WHERE id=?',state.user.id);
+  h.db.provisionStaff(staffEmails(h.env));assert.equal((await h.request('/staff/api/state',undefined,headers)).status,403);
+  h.db.sql.exec('UPDATE users SET enabled=1 WHERE id=?',state.user.id);h.env.STAFF_EMAILS='';
+  assert.equal((await h.request('/staff/api/state',undefined,headers)).status,403);
+  assert.equal((await h.staffRequest('/api/state')).status,200);
+});
+test('internal staff API independently checks the approved email list',async()=>{
+  const h=harness({STAFF_EMAILS:'second@example.test'});
+  for(const [address,status]of [['second@example.test',200],['outsider@example.test',403]]){
+    const response=await databaseRequest(h.db,new Request('https://internal/api/state',{method:'POST',headers:{'X-Tether-Mode':'staff','X-Verified-Email':address},body:JSON.stringify({method:'GET'})}),h.env);
+    assert.equal(response.status,status);
+  }
 });
 test('password validation, CSRF and server-held sessions protect member setup',async()=>{
   const h=harness();assert.equal((await h.request('/api/unlock',{password:'wrong'})).status,401);

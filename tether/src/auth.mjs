@@ -1,6 +1,13 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { AppError, email } from './validation.mjs';
 const keySets = new Map();
+export function staffEmails(env) {
+  try {
+    const additional=env.STAFF_EMAILS?env.STAFF_EMAILS.split(','):[];
+    return [...new Set([env.BOOTSTRAP_ADMIN_EMAIL,...additional].filter(v=>v?.trim()).map(email))];
+  } catch {throw new AppError('Staff sign-in configuration is unavailable.',503);}
+}
+export function isStaffEmail(value,env) {return staffEmails(env).includes(email(value));}
 export async function verifyToken(token, env, keys) {
   if (!env.ACCESS_AUD || !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(env.ACCESS_TEAM_DOMAIN || '')) throw new AppError('Sign-in is temporarily unavailable.',503);
   if (!token) throw new AppError('Your session has expired. Sign in again.',401);

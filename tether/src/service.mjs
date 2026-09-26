@@ -1,5 +1,5 @@
 import { AppError,admin,profile,id,text } from './validation.mjs';
-import { digest,randomToken,sessionCookie,matchesPassword } from './auth.mjs';
+import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail } from './auth.mjs';
 import { json,failure } from './http.mjs';
 export async function databaseRequest(db,request,env={}) {
   try {
@@ -43,7 +43,7 @@ export async function databaseRequest(db,request,env={}) {
     let actor;
     if(staff){
       actor=request.headers.get('X-Verified-Email');
-      if(!env.BOOTSTRAP_ADMIN_EMAIL||actor!==env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase())throw new AppError('Staff access denied.',403);
+      if(!actor||!isStaffEmail(actor,env))throw new AppError('Staff access denied.',403);
     }else actor=db.memberPrincipal(gateHash,deviceHash,passwordVersion);
     const user=db.authorize(actor);if(staff)admin(user);
     db.limit(user,path==='/api/action'||path==='/api/device-code');
