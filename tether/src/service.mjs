@@ -1,5 +1,6 @@
-import { AppError,admin,profile,id,text } from './validation.mjs';
+import { AppError,admin,profile,id,text,phone } from './validation.mjs';
 import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail } from './auth.mjs';
+import {confirmedPin,pinValue,hashPin,pinFingerprint,sameHash} from './pin.mjs';
 import { json,failure } from './http.mjs';
 export async function databaseRequest(db,request,env={}) {
   try {
@@ -28,12 +29,22 @@ export async function databaseRequest(db,request,env={}) {
       if(!device)return json({mode:'setup'});
       db.authorize({userId:device.user_id});return json({mode:'member'});
     }
-    if(!staff&&['/api/join','/api/connect'].includes(path)&&method==='POST') {
+    if(!staff&&['/api/join','/api/connect','/api/connect-pin'].includes(path)&&method==='POST') {
       db.gate(gateHash,passwordVersion);db.loginLimit(request.headers.get('X-Client-Hash')||'unknown');
       if(db.session(deviceHash,'device'))throw new AppError('This device already has a profile. Refresh to continue.',409);
       const token=randomToken(),hash=await digest(token);
-      if(path==='/api/join')db.join(gateHash,hash,passwordVersion,body,await digest(JSON.stringify(profile(body))));
-      else {
+      if(path==='/api/join') {
+        const value=confirmedPin(body),details=profile(body),credentials=await hashPin(value,env.PIN_PEPPER);
+        const joinHash=await pinFingerprint('tether-profile-registration:'+JSON.stringify([details,value]),env.PIN_PEPPER);
+        db.join(gateHash,hash,passwordVersion,body,joinHash,credentials);
+      } else if(path==='/api/connect-pin') {
+        const value=pinValue(body.pin),fullName=text(body.full_name,'Full name',100,2),phoneNumber=phone(body.phone_number);
+        await pinFingerprint('tether-profile-pin-readiness',env.PIN_PEPPER);
+        const attempt=db.reservePinAttempt(fullName,phoneNumber);
+        const credentials=await hashPin(value,env.PIN_PEPPER,attempt?.salt||'0'.repeat(32));
+        if(!sameHash(credentials.hash,attempt?.hash||'0'.repeat(64)))throw new AppError('Those details could not be verified. Check them or use a connection code. PIN recovery locks after five unsuccessful attempts; set a new PIN from a connected device to unlock it.',401);
+        db.connectPin(gateHash,hash,passwordVersion,attempt,fullName,phoneNumber);
+      } else {
         const code=typeof body.code==='string'?body.code.replace(/[ -]/g,'').toLowerCase():'';
         if(!/^[a-f0-9]{32}$/.test(code))throw new AppError('Enter a valid connection code.');
         db.connect(gateHash,hash,passwordVersion,await digest(code));
@@ -46,10 +57,17 @@ export async function databaseRequest(db,request,env={}) {
       if(!actor||!isStaffEmail(actor,env))throw new AppError('Staff access denied.',403);
     }else actor=db.memberPrincipal(gateHash,deviceHash,passwordVersion);
     const user=db.authorize(actor);if(staff)admin(user);
-    db.limit(user,path==='/api/action'||path==='/api/device-code');
+    db.limit(user,['/api/action','/api/device-code','/api/profile-pin'].includes(path));
     if (path==='/access') return json({ok:true});
     if (path==='/api/state' && method==='GET') return json(db.state(user));
     if (method!=='POST') throw new AppError('Method not allowed.',405);
+    if(path==='/api/profile-pin') {
+      const value=confirmedPin(body),existing=db.pinRecord(user.id);
+      if(existing&&body.replace!==true)throw new AppError('A PIN is already set. Refresh and use Change PIN in Profile.',409);
+      const credentials=await hashPin(value,env.PIN_PEPPER);
+      const currentActor=staff?actor:db.memberPrincipal(gateHash,deviceHash,passwordVersion);
+      return json(db.savePin(currentActor,credentials,existing?.revision||0));
+    }
     if(path==='/api/device-code') {
       const target=staff&&body.user_id?id(body.user_id):user.id;
       const code=randomToken(16);

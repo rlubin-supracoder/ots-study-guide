@@ -41,6 +41,41 @@ export class Database {
     if (!user?.enabled) throw new AppError('Your account has not been approved or has been disabled. Contact your Tether administrator.', 403);
     return member?{...user,role:'member'}:user;
   }
+  pinRecord(userId) {return this.one('SELECT * FROM profile_pins WHERE user_id=?',userId);}
+  savePin(identity,credentials,expectedRevision=0) {
+    return this.storage.transactionSync(()=>{
+      const user=this.authorize(identity),existing=this.pinRecord(user.id),now=this.clock();
+      if((existing?.revision||0)!==expectedRevision)throw new AppError('Your PIN changed on another device. Refresh and try again.',409);
+      if(!/^[a-f0-9]{32}$/.test(credentials.salt)||!/^[a-f0-9]{64}$/.test(credentials.hash))throw new AppError('Invalid PIN configuration.',503);
+      this.sql.exec('INSERT INTO profile_pins(user_id,salt,hash,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET salt=excluded.salt,hash=excluded.hash,revision=profile_pins.revision+1,failed_attempts=0,updated_at=excluded.updated_at',user.id,credentials.salt,credentials.hash,now,now);
+      this.audit(user.id,user.id,null,existing?'PROFILE_PIN_CHANGED':'PROFILE_PIN_CREATED',{},now);
+      return {ok:true};
+    });
+  }
+  pinMember(fullName,phoneNumber) {
+    const matches=this.rows('SELECT * FROM users WHERE enabled=1 AND phone_number=?',phoneNumber).filter(user=>user.full_name?.toLowerCase()===fullName.toLowerCase());
+    return matches.length===1?matches[0]:null;
+  }
+  reservePinAttempt(fullName,phoneNumber) {
+    return this.storage.transactionSync(()=>{
+      const user=this.pinMember(fullName,phoneNumber),pin=user&&this.pinRecord(user.id);
+      if(!pin||pin.failed_attempts>=5)return null;
+      this.sql.exec('UPDATE profile_pins SET failed_attempts=failed_attempts+1 WHERE user_id=?',user.id);
+      return pin;
+    });
+  }
+  connectPin(gateHash,deviceHash,passwordVersion,attempt,fullName,phoneNumber) {
+    return this.storage.transactionSync(()=>{
+      this.gate(gateHash,passwordVersion);
+      const user=this.pinMember(fullName,phoneNumber),current=user&&this.pinRecord(user.id);
+      if(!attempt||!current||attempt.user_id!==user.id||current.revision!==attempt.revision||current.hash!==attempt.hash||current.salt!==attempt.salt)throw new AppError('Those details could not be verified. Use a connection code or try your current details.',401);
+      this.createSession('device',deviceHash,user.id);
+      this.sql.exec('UPDATE profile_pins SET failed_attempts=0 WHERE user_id=?',user.id);
+      this.sql.exec('UPDATE sessions SET user_id=?,join_hash=NULL WHERE token_hash=?',user.id,gateHash);
+      this.audit(user.id,user.id,null,'PROFILE_PIN_RECONNECTED',{},this.clock());
+      return {ok:true};
+    });
+  }
   loginLimit(client) {
     const window=Math.floor(Date.parse(this.clock())/900000);
     for(const [key,max]of [[`login:${client}`,60],['login:global',1500]]) {
@@ -67,7 +102,7 @@ export class Database {
     this.sql.exec('INSERT INTO sessions(token_hash,kind,user_id,password_version,created_at,expires_at) VALUES (?,?,?,?,?,?)',hash,kind,userId,passwordVersion,now,new Date(Date.parse(now)+duration).toISOString());
     this.sql.exec('DELETE FROM sessions WHERE expires_at <= ?',now);
   }
-  join(gateHash,deviceHash,passwordVersion,data,joinHash) {
+  join(gateHash,deviceHash,passwordVersion,data,joinHash,pinCredentials) {
     return this.storage.transactionSync(()=>{
       const gate=this.gate(gateHash,passwordVersion),next=profile(data),now=this.clock();let userId=gate.user_id;
       if(userId) {
@@ -78,8 +113,11 @@ export class Database {
         if(this.one('SELECT COUNT(*) n FROM users').n>=1000)throw new AppError('The member limit has been reached. Contact staff.',409);
         userId=crypto.randomUUID();
         this.sql.exec("INSERT INTO users(id,email,full_name,flight_number,room_number,phone_number,account_type,created_at,updated_at) VALUES (?,?,?,?,?,?,'device',?,?)",userId,`${userId}@members.tether.invalid`,next.full_name,next.flight_number,next.room_number,next.phone_number,now,now);
+        if(!pinCredentials||!/^[a-f0-9]{32}$/.test(pinCredentials.salt)||!/^[a-f0-9]{64}$/.test(pinCredentials.hash))throw new AppError('Create a four-digit profile PIN.');
+        this.sql.exec('INSERT INTO profile_pins(user_id,salt,hash,created_at,updated_at) VALUES (?,?,?,?,?)',userId,pinCredentials.salt,pinCredentials.hash,now,now);
         this.sql.exec('UPDATE sessions SET user_id=?,join_hash=? WHERE token_hash=?',userId,joinHash,gateHash);
         this.audit(userId,userId,null,'MEMBER_REGISTERED',{},now);
+        this.audit(userId,userId,null,'PROFILE_PIN_CREATED',{},now);
       }
       this.createSession('device',deviceHash,userId);
       return {ok:true};
@@ -92,6 +130,7 @@ export class Database {
       if(reason) {
         admin(user);reason=text(reason,'Reason',240,3);
         this.sql.exec("DELETE FROM sessions WHERE user_id=? AND kind IN ('device','connect','gate')",target.id);
+        this.sql.exec('DELETE FROM profile_pins WHERE user_id=?',target.id);
       } else this.sql.exec("DELETE FROM sessions WHERE user_id=? AND kind='connect'",target.id);
       this.createSession('connect',hash,target.id);
       this.audit(user.id,target.id,null,reason?'MEMBER_ACCESS_RESET':'DEVICE_CODE_CREATED',reason?{reason}:{},now);
@@ -124,7 +163,8 @@ export class Database {
     const active = this.one('SELECT * FROM checkouts WHERE user_id=? AND status=?', user.id, 'ACTIVE') || null;
     const fields = rosterFields + (user.role === 'admin' ? ',phone_number' : '');
     const roster=this.rows(`SELECT ${fields} FROM checkouts WHERE status='ACTIVE' ORDER BY expected_return_at,checked_out_at`);
-    const result={user:{...user,email:user.account_type==='device'?null:user.email},active,profile_complete:complete(user),roster,server_time:now};
+    const pin=this.pinRecord(user.id);
+    const result={user:{...user,email:user.account_type==='device'?null:user.email,has_pin:!!pin,pin_locked:!!pin&&pin.failed_attempts>=5},active,profile_complete:complete(user),roster,server_time:now};
     if(user.role==='admin') {
       const ready=this.one('SELECT COUNT(*) AS n FROM users WHERE enabled=1 AND full_name IS NOT NULL').n;
       result.counts={on_campus:ready-roster.length,off_campus:roster.length,overdue:roster.filter(r=>r.expected_return_at<now).length,pending:this.one('SELECT COUNT(*) AS n FROM users WHERE enabled=1 AND full_name IS NULL').n};
@@ -195,6 +235,7 @@ export class Database {
       if (!complete(user)) throw new AppError('Complete your profile before checking out.');
       version(user.version,data.version);
       if (this.one("SELECT id FROM checkouts WHERE user_id=? AND status='ACTIVE'",user.id)) throw new AppError('You are already checked out. Your current status has been refreshed.',409);
+      if(!this.pinRecord(user.id))throw new AppError('Create your four-digit profile PIN before checking out. Refresh Tether if you do not see the PIN setup.',409);
       const destination=text(data.destination,'Destination',160,2), returnAt=expected(data.expected_return_at,now), recordId=crypto.randomUUID();
       this.sql.exec("INSERT INTO checkouts(id,user_id,full_name,flight_number,room_number,phone_number,destination,checked_out_at,expected_return_at,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,'ACTIVE',?,?)",recordId,user.id,user.full_name,user.flight_number,user.room_number,user.phone_number,destination,now,returnAt,now,now);
       this.sql.exec('UPDATE users SET version=version+1,updated_at=? WHERE id=?',now,user.id);

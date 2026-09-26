@@ -16,10 +16,13 @@ export function profile(body) {
   const full_name = text(body.full_name, 'Full name', 100, 2);
   const flight_number = text(body.flight_number, 'Flight number', 20);
   const room_number = text(body.room_number, 'Room number', 20);
-  let digits = String(body.phone_number ?? '').replace(/[() .+\-]/g, '');
+  return {full_name,flight_number,room_number,phone_number:phone(body.phone_number)};
+}
+export function phone(value) {
+  let digits = String(value ?? '').replace(/[() .+\-]/g, '');
   if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
   if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(digits)) throw new AppError('Enter a valid 10-digit U.S. phone number.');
-  return { full_name, flight_number, room_number, phone_number: `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}` };
+  return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
 }
 export function complete(user) { return Boolean(user.full_name && user.flight_number && user.room_number && user.phone_number); }
 export function instant(value, label = 'Time') {

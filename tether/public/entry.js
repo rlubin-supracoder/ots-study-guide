@@ -1,5 +1,5 @@
 const errorBox=document.querySelector('#entryError');
-for(const [id,path]of [['unlockForm','/api/unlock'],['joinForm','/api/join'],['connectForm','/api/connect']]){
+for(const [id,path]of [['unlockForm','/api/unlock'],['joinForm','/api/join'],['connectForm','/api/connect'],['pinConnectForm','/api/connect-pin']]){
   const form=document.getElementById(id);if(!form)continue;
   form.addEventListener('submit',async event=>{
     event.preventDefault();errorBox.hidden=true;

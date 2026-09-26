@@ -5,14 +5,16 @@ OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.r
 ## Member workflow
 
 1. Enter the campus password supplied by staff. Members do not use email verification.
-2. On the first device, create a profile with name, flight, room and U.S. phone number.
+2. On the first device, create a profile with name, flight, room, U.S. phone number and a confirmed four-digit profile PIN. Existing members keep their profiles, status, history and device connections; they create a PIN before their next checkout. Check-in remains available without a PIN.
 3. **CHECK OUT** requires a destination and future return time, followed by confirmation.
 4. **CHECK IN** confirms return to campus. **My history** retains previous trips.
-5. **Profile → Connect another device** generates a private, one-use connection code valid for 24 hours. Enter the campus password on the new device, choose **Already have a Tether profile?**, and enter the code. Existing email profiles need a code from staff; they are not deleted or automatically claimable by name.
+5. On a new device, enter the campus password and open **Already have a Tether profile?**. Reconnect using your saved full name, phone number and PIN, or use a connection code. **Profile → Connect another device** generates a private, one-use code valid for 24 hours. Staff can also supply a code. Reconnection preserves the same profile and current accountability status.
+
+**Profile → Create/Change profile PIN** sets or changes your PIN from an authenticated device. PINs retain leading zeroes and never appear in staff lists or logs. Five unsuccessful attempts lock PIN recovery across devices until you set a new PIN from a connected device. This does not block check-in/out or connection codes. Forgotten PINs can be replaced after reconnecting with a code. Recovery requires a unique match for full name and contact number; ambiguous matches use the connection-code fallback.
 
 The roster is visible to members who know the campus password and have completed setup. It refreshes every 15 seconds while visible and after personal changes. Other members' phone numbers are excluded from member API responses. Times are always **America/Chicago**; daylight-saving gaps and ambiguous times are rejected. Expected return must be within seven days. Overdue trips remain active until checked in.
 
-The password unlock lasts 24 hours. A separate secure cookie remembers the profile for up to one year. **Log out** locks the application but remembers the profile. **Profile → Forget this device** removes the device connection without deleting history. Browser-data clearing requires reconnecting with a code. On a shared phone, forget the device before handing it over.
+The password unlock lasts 24 hours. A separate secure cookie remembers the profile for up to one year. **Log out** locks the application but remembers the profile. **Profile → Forget this device** removes the device connection without deleting history. Browser-data clearing requires reconnecting with a PIN or connection code. On a shared phone, forget the device before handing it over.
 
 Network failures never imply success: the app marks status unverified, disables the main action, and reconciles with the server. Retried actions reuse their request identifier; refreshing reads authoritative state. There is no GPS collection.
 
@@ -22,7 +24,7 @@ Use the phone browser's **Add to Home Screen** option. The manifest supports sta
 
 Open **/staff** and use an approved staff email for email-code sign-in. Staff do not need the campus password. New staff complete their own profile before checking out; staff tools are available immediately.
 
-- **Members → Connection code** reconnects an existing profile. **Reset existing devices** revokes that member's device sessions and outstanding codes before creating a replacement code. A reason is required.
+- **Members → Connection code** reconnects an existing profile. **Reset devices and PIN** revokes that member's device sessions, outstanding codes and PIN before creating a replacement code. A reason is required. The member creates a new PIN after reconnecting, before their next checkout.
 - **Manage access** enables/disables a member. Close active trips before disabling access. Historical records remain intact.
 - **Records** provides search, flight/date/status filters, and member history in pages of 50. Date filters use Central departure dates.
 - **Check member in** records the staff-confirmed return and reason as ADMIN_CLOSED.
@@ -36,6 +38,8 @@ Campus counts include enabled members with completed profiles. Names, flights, r
 A separate Cloudflare Worker and SQLite Durable Object follow the root website and Operation Valor deployment model. Native JavaScript/CSS use the existing navy/blue visual identity. Their routes and databases remain independent.
 
 **Member authentication:** the Worker verifies MEMBER_PASSWORD server-side, issues a random 256-bit gate token and a separate random 256-bit device token, and stores only token hashes. Cookies use the __Host- prefix, Secure, HttpOnly, SameSite=Strict and Path=/. The database checks password version, session expiry and enabled user on every private request. Device authorization is always capped to Member, even for an underlying administrator profile. Setup cannot select or claim another member by name. Connection codes use 128 random bits, are stored hashed, are one-use, and expire after 24 hours. Lost-response retries are supported on the same gate.
+
+Profile PINs are hashed with PBKDF2-SHA256 (100,000 iterations), a random 128-bit salt, and a separate 256-bit Worker secret used for HMAC preprocessing. The secret is not stored in the database. PIN credentials live in a separate table and never leave the server. PIN attempts require the campus password, share the login IP/global limits, and reserve one of five account attempts transactionally before verification, so parallel requests cannot evade lockout. Identity, enabled status and PIN revision are rechecked before issuing a member-only device session. Staff still require their approved email and Cloudflare Access verification.
 
 **Staff authentication:** Cloudflare Access protects /staff and its subpaths, including /staff/api/*. Its allow policy names only approved staff emails. The Worker independently validates the Access JWT signature, issuer, audience, expiry, subject and email, then checks its own approved email list and an enabled database administrator role. The original bootstrap administrator remains included alongside STAFF_EMAILS. Newly configured staff accounts are created or promoted once with a STAFF_APPROVED audit event; subsequent deployments do not re-enable disabled accounts or overwrite profiles and history. Email verification alone is not two-factor authentication. Member routes cannot grant staff authority. Access sessions last 24 hours with Secure/HttpOnly cookies.
 
@@ -52,6 +56,7 @@ Keep binding **ACCOUNTABILITY**, class **Accountability**, and object name **tet
 | users | Profile, account type, role, enabled flag, version and UTC timestamps |
 | checkouts | Profile snapshot, destination, departure/expected/actual return, status and revision |
 | sessions | Hashed gate/device/connection tokens, expiry and password version |
+| profile_pins | Salted, peppered PIN credentials, revision and persistent failed-attempt count |
 | audit | Actor, subject, trip, timestamp, event and correction details |
 | requests | Per-user idempotency receipts retained seven days |
 | limits | Persistent request-rate counters |
@@ -83,12 +88,15 @@ Use Node.js 24 and pnpm 11 from tether/:
 | BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial administrator, always included in the staff email list |
 | STAFF_EMAILS | Worker secret: comma-separated additional approved staff emails |
 | MEMBER_PASSWORD | Worker secret: shared campus password |
+| PIN_PEPPER | Worker secret: 64 hexadecimal characters generated from 32 random bytes; protect and retain this key |
 | TETHER_STAFF_EMAILS | Local setup script's complete staff list: bootstrap plus additional emails |
 | CLOUDFLARE_ACCOUNT_ID | Account for token-based deployment |
 | CLOUDFLARE_API_TOKEN | Optional deployment token instead of Wrangler OAuth |
 | CLOUDFLARE_ACCESS_TOKEN_FILE | Local temporary Access setup token file |
 
 Set secrets with **pnpm exec wrangler secret put MEMBER_PASSWORD** and **pnpm exec wrangler secret put BOOTSTRAP_ADMIN_EMAIL**; enter values interactively. Password rotation invalidates gate sessions while retaining profile connections. Never commit secrets or put the password in public assets.
+
+Before deploying PIN support, generate a cryptographically random 32-byte secret and store its hexadecimal encoding with **pnpm exec wrangler secret put PIN_PEPPER**. Keep it stable across deployments. Losing or changing this secret makes existing PINs unusable; use existing device sessions or connection codes to set replacements. Never store this secret with a database export or in source control.
 
 Preserve the existing Tether Access app and audience. **node scripts/configure-access.mjs** reviews the planned scope; add **--apply** to set its policy to the complete TETHER_STAFF_EMAILS list at /staff. It needs a temporary account-scoped token with **Access: Apps and Policies — Edit**. It refuses unexpected configurations. When migrating from whole-site Access, deploy the password-protected Worker and set its password secret **before** applying the Access change. Delete the local token and revoke/expire it afterward.
 
@@ -98,13 +106,13 @@ GitHub CI runs tests/build/runtime checks without deployment credentials. Deploy
 
 Only **tether.russelllubinski.us** belongs to this Worker. Cloudflare manages DNS routing, TLS and renewal. The zone and Worker enforce HTTP-to-HTTPS. Do not add wildcard routes or modify root-site/Valor DNS.
 
-001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type without replacing profiles or trips. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
+001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type. 003_profile_pins.sql only creates the PIN table: it does not update or delete users, trips, audit history or sessions. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
 
 To add staff, preserve existing additional addresses and update the STAFF_EMAILS Worker secret with **pnpm exec wrangler secret put STAFF_EMAILS**. Deploy or activate the updated configuration; the Durable Object creates/promotes each newly configured staff account once, preserving existing records and adding an audit event. Set TETHER_STAFF_EMAILS to the complete list, including BOOTSTRAP_ADMIN_EMAIL, and apply the Access configuration script. Verify the account in **Staff → Members**. No mailbox address belongs in public source. A database promotion alone does not grant staff access, and members cannot promote themselves.
 
 To revoke staff access, remove the email from both the Worker secret and Access policy, then disable its account if all member access should also end. Existing JWTs are denied immediately by the Worker's email check after configuration propagation. Disabled accounts remain disabled across deployments and must be deliberately enabled in **Manage access**. Preserve the original administrator unless an administration transfer is explicitly intended.
 
-Correct individual errors through **Staff → Records → Correct record**; retain the reason and audit. Use **Connection code → Reset existing devices** for a lost phone.
+Correct individual errors through **Staff → Records → Correct record**; retain the reason and audit. Use **Connection code → Reset devices and PIN** for a lost phone.
 
 Cloudflare provides a rolling [30-day SQLite Durable Object recovery window](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api). Before material upgrades, capture a recovery bookmark via an account-controlled maintenance deployment. Disaster recovery requires pausing writes, choosing a bookmark/time, scheduling restoration with onNextSessionRestoreBookmark, retaining its undo bookmark and restarting the object. Verify the roster with staff before reopening writes. There is no public restore/delete endpoint.
 
@@ -112,4 +120,4 @@ History is not automatically deleted. No off-provider backup schedule is configu
 
 ## Verification
 
-Automated tests cover upgrades, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify state/session persistence across restart. Browser checks cover member/staff workflows and phone/tablet/desktop layouts. Synthetic identities stay local.
+Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Browser checks cover member/staff workflows and phone/tablet/desktop layouts. Synthetic identities stay local.

@@ -47,6 +47,7 @@ function renderPersonal(){
   box.append(statusBadge(a?'OFF CAMPUS':'ON CAMPUS',a?'off':''));
   if(a){box.append(details([['Destination',a.destination,true],['Expected return',dateTime(a.expected_return_at)],['Checked out',dateTime(a.checked_out_at)]]));if(Date.parse(a.expected_return_at)<now())box.append(el('p','tag overdue','OVERDUE — Please return or contact staff.'));}
   const action=button(a?'CHECK IN':'CHECK OUT',a?checkin:checkout,'button hero'+(a?' checkin':''));action.disabled=busy||!fresh;box.append(action,el('p','action-note',fresh?(a?'Back on campus? Confirm your return.':'Leaving campus? Add your destination and return time.'):'Status is unverified. Reconnect to continue.'));
+  if(!u.has_pin&&!a)box.append(el('p','hint','Before your next checkout, you’ll create a four-digit PIN to reconnect to this profile.'));
 }
 function tripCard(record,staff=false,history=false){
   const overdue=record.status==='ACTIVE'&&Date.parse(record.expected_return_at)<now();
@@ -72,6 +73,8 @@ async function refresh(force=false){
   refreshPromise=(async()=>{try{
     const next=await api('/api/state');serverOffset=Date.parse(next.server_time)-Date.now();lastSync=Date.now();fresh=true;document.body.classList.remove('locked');$('#authError').hidden=true;
     const changed=JSON.stringify([next.user,next.active])!==JSON.stringify([state?.user,state?.active]);state=next;$('#adminNav').hidden=state.user.role!=='admin';
+    $('#profilePinButton').textContent=state.user.has_pin?'Change profile PIN':'Create profile PIN';
+    $('#pinStatus').textContent=state.user.pin_locked?'PIN recovery is locked after unsuccessful attempts. Set a new PIN here to unlock it.':state.user.has_pin?'Your PIN is set. Use it with your full name and phone number to reconnect on another device.':'Create your four-digit PIN before your next checkout. Your profile and checkout history will stay the same.';
     if(view==='admin'&&state.user.role!=='admin')navigate('home');
     if(changed||force||personalOverdue!==(!!state.active&&Date.parse(state.active.expected_return_at)<now())||!$('#personal .hero'))renderPersonal();else if($('#personal .hero'))$('#personal .hero').disabled=busy;
     renderRoster();$('#sync').textContent='● Updated just now';return true;
@@ -91,8 +94,30 @@ async function navigate(next){
 function modal(title){$('#dialogTitle').textContent=title;$('#dialogBody').replaceChildren();dialogError('');if(!$('#dialog').open)$('#dialog').showModal();return $('#dialogBody');}
 function field(form,label,name,type='text',value='',required=true,max){const wrap=el('label','',label),input=el('input');input.name=name;input.type=type;input.value=value;input.required=required;if(max)input.maxLength=max;wrap.append(input);form.append(wrap);return input;}
 function submit(form,label){const b=el('button','button primary',label);b.type='submit';form.append(b);return b;}
+function profilePin(continueCheckout=false){
+  if(!state||!fresh)return;
+  const replace=state.user.has_pin,box=modal(replace?'Change your profile PIN':'Create your profile PIN'),form=el('form','form-stack');
+  form.append(el('p','',continueCheckout?'Create a four-digit PIN before checking out. You can use it to reconnect to this same profile later.':'Use this PIN with your full name and phone number to reconnect to your existing profile.'),el('p','hint','Your current status and checkout history will stay the same.'));
+  for(const [name,label]of [['pin','New profile PIN'],['pin_confirmation','Confirm profile PIN']]){const input=field(form,label,name,'password','',true,4);input.minLength=4;input.pattern='[0-9]{4}';input.inputMode='numeric';input.autocomplete='new-password';}
+  submit(form,continueCheckout?'Save PIN and continue':'Save PIN');box.append(form);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(busy)return;dialogError('');
+    if(form.elements.pin.value!==form.elements.pin_confirmation.value){dialogError('The two PINs do not match.');return;}
+    setBusy(true);let saved=false;
+    try{
+      await api('/api/profile-pin',{...Object.fromEntries(new FormData(form)),replace});form.reset();
+      if(refreshPromise)await refreshPromise;
+      if(!await refresh(true))throw new Error('Your PIN was saved, but status could not be refreshed. Reconnect before continuing.');
+      saved=true;$('#dialog').close();notice('Your profile PIN is saved.');
+    }catch(error){await refresh(false);if($('#dialog').open)dialogError(error.message);else notice(error.message,true);}
+    finally{setBusy(false);}
+    if(saved&&continueCheckout)checkout();
+  });
+}
 function checkout(){
   if(!fresh||!state.profile_complete)return;
+  if(state.active)return checkin();
+  if(!state.user.has_pin)return profilePin(true);
   const u={...state.user};const box=modal('Plan your checkout'),form=el('form','form-stack');
   field(form,'Destination / location','destination','text','',true,160).minLength=2;
   field(form,'Expected return · Central Time','return','datetime-local',centralInput(new Date(now()+2*3600000).toISOString()));
@@ -156,8 +181,8 @@ async function connectionCode(data={}) {
   const label=el('label','','Connection code'),input=el('input');input.readOnly=true;input.value=result.code;label.append(input);box.append(label,button('Copy code',async()=>{try{await navigator.clipboard.writeText(result.code);dialogError('Code copied.');}catch{input.select();dialogError('Select and copy the code above.');}}));
 }
 function staffConnection(user) {
-  const box=modal('Reconnect member'),form=el('form','form-stack');form.append(el('p','',user.full_name||user.email),el('p','hint','A connection code preserves this member’s profile and history. Reset device access only if their device is lost or no longer trusted.'));
-  const label=el('label','','Device access'),select=el('select');select.name='reset';for(const [value,title]of [['no','Connect another device'],['yes','Reset existing devices']]){const option=el('option','',title);option.value=value;select.append(option);}label.append(select);form.append(label);
+  const box=modal('Reconnect member'),form=el('form','form-stack');form.append(el('p','',user.full_name||user.email),el('p','hint','A connection code preserves this member’s profile, status and history. Resetting access signs existing devices out and clears the recovery PIN. The member will create a new PIN after reconnecting.'));
+  const label=el('label','','Device access'),select=el('select');select.name='reset';for(const [value,title]of [['no','Connect another device'],['yes','Reset devices and PIN']]){const option=el('option','',title);option.value=value;select.append(option);}label.append(select);form.append(label);
   field(form,'Accountability note','reason','text','',true,240).minLength=3;submit(form,'Create connection code');box.append(form);
   form.addEventListener('submit',guarded(async event=>{event.preventDefault();await connectionCode({user_id:user.id,reset:select.value==='yes',reason:form.elements.reason.value});}));
 }
@@ -175,7 +200,8 @@ $('#moreAudit').addEventListener('click',guarded(async()=>{auditOffset+=50;await
 if(staffPage)$('#logout').href='/cdn-cgi/access/logout';
 $('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign('/');}lock();retries.clear();}));
 $('#connectDevice').addEventListener('click',guarded(()=>connectionCode()));
-$('#forgetDevice').addEventListener('click',()=>{const box=modal('Forget this device?');box.append(el('p','','Your profile and history will be kept. You will need a connection code from another signed-in device or from staff to reconnect.'));box.append(button('Forget and log out',guarded(async()=>{await api('/api/logout',{forget_device:true});location.assign('/');}),'button primary'));});
+$('#profilePinButton').addEventListener('click',()=>profilePin());
+$('#forgetDevice').addEventListener('click',()=>{const box=modal('Forget this device?');box.append(el('p','','Your profile, status and history will be kept. Reconnect with your profile PIN or a connection code from another device or staff.'));box.append(button('Forget and log out',guarded(async()=>{await api('/api/logout',{forget_device:true});location.assign('/');}),'button primary'));});
 window.addEventListener('offline',()=>{fresh=false;$('#sync').textContent='Offline · status unverified';renderPersonal();notice('You are offline. Reconnect to verify your status before checking in or out.',true);});
 window.addEventListener('online',()=>refresh(true));
 window.addEventListener('pageshow',event=>{if(event.persisted){lock();refresh(true);}});

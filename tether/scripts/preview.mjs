@@ -7,10 +7,11 @@ import {databaseRequest} from '../src/service.mjs';
 const f=fixture();f.setTime(new Date().toISOString());f.setup('staff@example.test','Preview Staff');
 for(const [email,name] of [['member@example.test','Preview Member'],['overdue@example.test','Preview Overdue']]){f.invite(email);f.setup(email,name);}
 f.setTime(new Date(Date.now()-3*3600000).toISOString());f.send('overdue@example.test','checkout',{destination:'Preview destination',expected_return_at:new Date(Date.now()-3600000).toISOString(),version:f.db.authorize('overdue@example.test').version});
+f.db.sql.exec('DELETE FROM profile_pins');
 f.db.clock=()=>new Date().toISOString();
 const origin='http://127.0.0.1:8791';
 const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.mjs':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
-const env={APP_ORIGIN:origin,MEMBER_PASSWORD:'preview-password',BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',ACCOUNTABILITY:{idFromName:x=>x,get:()=>({fetch:r=>databaseRequest(f.db,r,env)})},ASSETS:{fetch:async request=>{const path=new URL(request.url).pathname;try{return new Response(await readFile(new URL('../public'+path,import.meta.url)),{headers:{'Content-Type':mime[path.slice(path.lastIndexOf('.'))]||'application/octet-stream'}});}catch{return new Response('Not found',{status:404});}}}};
+const env={APP_ORIGIN:origin,MEMBER_PASSWORD:'preview-password',PIN_PEPPER:'a'.repeat(64),BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',ACCOUNTABILITY:{idFromName:x=>x,get:()=>({fetch:r=>databaseRequest(f.db,r,env)})},ASSETS:{fetch:async request=>{const path=new URL(request.url).pathname;try{return new Response(await readFile(new URL('../public'+path,import.meta.url)),{headers:{'Content-Type':mime[path.slice(path.lastIndexOf('.'))]||'application/octet-stream'}});}catch{return new Response('Not found',{status:404});}}}};
 createServer(async(req,res)=>{
   try{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);

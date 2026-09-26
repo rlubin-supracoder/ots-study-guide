@@ -11,12 +11,13 @@ test('session migration upgrades the existing database without replacing profile
   let db=new Database(s,[migrations[0]],'staff@example.test',clock);
   const send=(action,data)=>db.mutate('staff@example.test',{action,data,request_id:crypto.randomUUID()},crypto.randomUUID());
   send('profile',{full_name:'Existing Staff',flight_number:'27-01',room_number:'104',phone_number:'3345550123',version:1});
-  const user=db.authorize('staff@example.test');const trip=send('checkout',{destination:'Existing destination',expected_return_at:'2026-09-25T22:00:00.000Z',version:user.version});
+  const user=db.authorize('staff@example.test'),trip={record_id:crypto.randomUUID()};
+  db.sql.exec("INSERT INTO checkouts(id,user_id,full_name,flight_number,room_number,phone_number,destination,checked_out_at,expected_return_at,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,'ACTIVE',?,?)",trip.record_id,user.id,user.full_name,user.flight_number,user.room_number,user.phone_number,'Existing destination',clock(),'2026-09-25T22:00:00.000Z',clock(),clock());
   db=new Database(s,migrations,'staff@example.test',clock);
   assert.equal(db.state(db.authorize('staff@example.test')).active.id,trip.record_id);
   assert.equal(db.authorize('staff@example.test').id,user.id);
   assert.equal(db.authorize('staff@example.test').account_type,'email');
-  assert.equal(db.one('SELECT COUNT(*) n FROM schema_migrations').n,2);
+  assert.equal(db.one('SELECT COUNT(*) n FROM schema_migrations').n,3);
   new Database(s,migrations,'other@example.test',clock);assert.equal(db.one('SELECT COUNT(*) n FROM users').n,1);
 });
 test('required profile and invalid phone, script, excessive fields are rejected',()=>{

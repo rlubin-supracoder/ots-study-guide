@@ -7,8 +7,8 @@ import {databaseRequest} from '../src/service.mjs';
 import {verifyToken,staffEmails} from '../src/auth.mjs';
 const {privateKey,publicKey}=await generateKeyPair('RS256');
 const keys=createLocalJWKSet({keys:[{...await exportJWK(publicKey),kid:'test',alg:'RS256'}]});
-const envBase={APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test-audience',BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',MEMBER_PASSWORD:'test-campus-password'};
-const profile={full_name:'Test Member',flight_number:'27-01',room_number:'102',phone_number:'3345550123'};
+const envBase={APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test-audience',BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',MEMBER_PASSWORD:'test-campus-password',PIN_PEPPER:'a'.repeat(64)};
+const profile={full_name:'Test Member',flight_number:'27-01',room_number:'102',phone_number:'3345550123',pin:'0123',pin_confirmation:'0123'};
 async function token(email='staff@example.test',options={}){return new SignJWT({email}).setProtectedHeader({alg:'RS256',kid:'test'}).setSubject('test-user').setIssuedAt().setIssuer('https://test.cloudflareaccess.com').setAudience(options.audience||'test-audience').setExpirationTime(options.exp||'5m').sign(privateKey);}
 const cookie=r=>r.headers.get('Set-Cookie')?.split(';')[0];
 function harness(overrides={}){

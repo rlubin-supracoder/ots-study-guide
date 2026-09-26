@@ -6,7 +6,7 @@ const require=createRequire(import.meta.url),wranglerRequire=createRequire(requi
 const {Miniflare,convertV4MiniflareOptions}=wranglerRequire('miniflare');
 const root=path.resolve('dist'),sql=(await readdir(root)).filter(f=>f.endsWith('.sql'));
 const persist=path.resolve('.wrangler','runtime-test-'+crypto.randomUUID());
-const options={name:'tether-runtime-test',compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
+const options={name:'tether-runtime-test',compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',PIN_PEPPER:'a'.repeat(64),APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
 const runtimeOptions={...convertV4MiniflareOptions(options),resourcePersistencePath:persist,telemetry:{enabled:false}};
 let mf=new Miniflare(runtimeOptions);
 async function client(){const ns=await mf.getDurableObjectNamespace('ACCOUNTABILITY');return ns.get(ns.idFromName('tether-accountability-v1'));}
@@ -23,6 +23,7 @@ try{
   let state=(await call('staff@example.test','/api/state')).data;
   assert.equal(state.user.role,'admin');
   assert.equal((await action('staff@example.test','profile',{version:state.user.version,full_name:'Runtime Staff',flight_number:'27-01',room_number:'101',phone_number:'3345550123'})).status,200);
+  assert.equal((await call('staff@example.test','/api/profile-pin',{pin:'0123',pin_confirmation:'0123'})).status,200);
   state=(await call('staff@example.test','/api/state')).data;
   const data={destination:'Runtime test',expected_return_at:new Date(Date.now()+3600000).toISOString(),version:state.user.version};
   const results=await Promise.all(Array.from({length:20},()=>action('staff@example.test','checkout',data)));
@@ -39,11 +40,15 @@ try{
   const memberCall=(path,body,cookie='')=>mf.dispatchFetch('https://tether.test'+path,{method:body===undefined?'GET':'POST',headers:{Origin:'https://tether.test','Content-Type':'application/json','X-Tether-Request':'1',Cookie:cookie},body:body===undefined?undefined:JSON.stringify(body)});
   const unlocked=await memberCall('/api/unlock',{password:'runtime-password'});assert.equal(unlocked.status,200);
   const gate=unlocked.headers.get('Set-Cookie').split(';')[0];
-  const joined=await memberCall('/api/join',{full_name:'Runtime Member',flight_number:'27-01',room_number:'102',phone_number:'3345550124'},gate);assert.equal(joined.status,200);
+  const joined=await memberCall('/api/join',{full_name:'Runtime Member',flight_number:'27-01',room_number:'102',phone_number:'3345550124',pin:'0123',pin_confirmation:'0123'},gate);assert.equal(joined.status,200);
   const cookies=gate+'; '+joined.headers.get('Set-Cookie').split(';')[0];
   assert.equal((await (await memberCall('/api/state',undefined,cookies)).json()).user.role,'member');
   assert.equal((await memberCall('/api/admin/users',{},cookies)).status,403);
   await mf.dispose();mf=new Miniflare(runtimeOptions);stub=await client();
   assert.equal((await (await memberCall('/api/state',undefined,cookies)).json()).user.full_name,'Runtime Member');
-  console.log('Cloudflare runtime passed: migrations, staff authorization, concurrent checkout, restart persistence, check-in, history, password login and remembered member sessions.');
+  const newGate=(await memberCall('/api/unlock',{password:'runtime-password'})).headers.get('Set-Cookie').split(';')[0];
+  const reconnected=await memberCall('/api/connect-pin',{full_name:'Runtime Member',phone_number:'3345550124',pin:'0123'},newGate);assert.equal(reconnected.status,200);
+  const connectedCookies=newGate+'; '+reconnected.headers.get('Set-Cookie').split(';')[0];
+  assert.equal((await (await memberCall('/api/state',undefined,connectedCookies)).json()).user.full_name,'Runtime Member');
+  console.log('Cloudflare runtime passed: migrations, staff authorization, concurrent checkout, restart persistence, check-in, history, password login, PIN hashing and profile reconnection.');
 }finally{await mf.dispose();}
