@@ -1,4 +1,4 @@
-import { identity,csrf,bodyOf } from './auth.mjs';
+import { identity,csrf,bodyOf,cookieToken,digest } from './auth.mjs';
 import { AppError } from './validation.mjs';
 export const securityHeaders={
   'Cache-Control':'no-store, max-age=0',
@@ -18,18 +18,33 @@ export async function serveRequest(request,env,authenticate=identity) {
     if (url.protocol!=='https:' && env.APP_ORIGIN.startsWith('https:')) return new Response(null,{status:308,headers:{...securityHeaders,Location:env.APP_ORIGIN+url.pathname}});
     if (url.origin!==env.APP_ORIGIN) throw new AppError('Unknown application address.',404);
     if (!['GET','HEAD','POST'].includes(request.method)) throw new AppError('Method not allowed.',405);
-    const actor=await authenticate(request,env);
+    const staff=url.pathname==='/staff'||url.pathname.startsWith('/staff/');
+    const publicAssets=new Set(['/app.js','/app.css','/entry.js','/time.mjs','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png','/apple-touch-icon.png']);
+    async function asset(path) {
+      const assetUrl=new URL(path,env.APP_ORIGIN);
+      const response=await env.ASSETS.fetch(new Request(assetUrl,{method:request.method}));
+      return new Response(response.body,{status:response.status,headers:{...Object.fromEntries(response.headers),...securityHeaders}});
+    }
+    if(publicAssets.has(url.pathname)&&['GET','HEAD'].includes(request.method))return asset(url.pathname);
+    let actor;
+    if(staff) {
+      actor=await authenticate(request,env);
+      if(!env.BOOTSTRAP_ADMIN_EMAIL||actor.email!==env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase())throw new AppError('This staff page is restricted to the designated administrator.',403);
+    }
     const stub=env.ACCOUNTABILITY.get(env.ACCOUNTABILITY.idFromName('tether-accountability-v1'));
-    const isApi=url.pathname.startsWith('/api/');
+    const path=staff?url.pathname.slice('/staff'.length)||'/':url.pathname;
+    const isApi=path.startsWith('/api/');
     const body=request.method==='POST'?(csrf(request,env),await bodyOf(request)):null;
-    const headers={'Content-Type':'application/json','X-Verified-Email':actor.email};
-    const response=await stub.fetch(new Request('https://internal'+(isApi?url.pathname:'/access'),{method:'POST',headers,body:JSON.stringify({method:request.method,body})}));
-    if (!response.ok || isApi) return response;
+    const headers={'Content-Type':'application/json','X-Tether-Mode':staff?'staff':'member'};
+    if(actor)headers['X-Verified-Email']=actor.email;
+    for(const kind of ['gate','device']){const value=cookieToken(request,`__Host-tether-${kind}`);if(value)headers[`X-Member-${kind}`]=await digest(value);}
+    headers['X-Client-Hash']=await digest(request.headers.get('CF-Connecting-IP')||'unknown');
+    const response=await stub.fetch(new Request('https://internal'+(isApi?path:staff?'/access':'/entry'),{method:'POST',headers,body:JSON.stringify({method:request.method,body})}));
+    if(!response.ok||isApi)return response;
     if (request.method!=='GET' && request.method!=='HEAD') throw new AppError('Method not allowed.',405);
-    const assets=new Set(['/','/index.html','/app.js','/app.css','/time.mjs','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png','/apple-touch-icon.png']);
-    if (!assets.has(url.pathname)) throw new AppError('Page not found.',404);
-    if (url.pathname==='/') url.pathname='/index.html';
-    const asset=await env.ASSETS.fetch(new Request(url,{method:request.method}));
-    return new Response(asset.body,{status:asset.status,headers:{...Object.fromEntries(asset.headers),...securityHeaders}});
+    if(!['/','/index.html'].includes(path))throw new AppError('Page not found.',404);
+    if(staff)return asset('/index.html');
+    const entry=await response.json();
+    return asset(entry.mode==='member'?'/index.html':entry.mode==='setup'?'/setup.html':'/login.html');
   } catch(error) { return failure(error); }
 }

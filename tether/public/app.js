@@ -1,5 +1,9 @@
 import { centralInput,centralToUTC,dateTime } from './time.mjs';
 const $=selector=>document.querySelector(selector);
+const staffPage=location.pathname==='/staff'||location.pathname.startsWith('/staff/');
+$('#staffLink').hidden=staffPage;
+$('#signInLink').href=staffPage?'/staff':'/';
+$('#forgetDevice').hidden=staffPage;
 const el=(tag,className,content)=>{const node=document.createElement(tag);if(className)node.className=className;if(content!==undefined)node.textContent=content;return node;};
 let state=null,view='home',staffView='records',busy=false,fresh=false,profileVersion,historyOffset=0,adminOffset=0,auditOffset=0,memberFilter=null,rosterSignature='',adminSignature='',personalOverdue=false,users=[],lastSync=0,serverOffset=0,refreshPromise;
 const retries=new Map();
@@ -8,10 +12,11 @@ function notice(message,error=false){const node=$('#notice');node.textContent=me
 function dialogError(message){$('#dialogError').textContent=message;$('#dialogError').hidden=!message;}
 function lock(){fresh=false;document.body.classList.add('locked');$('#authError').hidden=false;$('#dialog').close();state=null;for(const id of ['personal','roster','myHistory','adminHistory','usersList','auditList','stats'])$('#'+id).replaceChildren();$('#profileForm').reset();}
 async function api(path,data){
+  if(staffPage)path='/staff'+path;
   let response;
   try{response=await fetch(path,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',redirect:'manual',headers:data===undefined?{}:{'Content-Type':'application/json','X-Tether-Request':'1'},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(15000)});}
   catch{throw new Error('Connection interrupted or session expired. Your change could not be confirmed. Refresh your status or sign in again before retrying.');}
-  if(response.type==='opaqueredirect'||response.status===401||response.status===403){lock();throw new Error('Sign-in or administrator approval is required.');}
+  if(response.type==='opaqueredirect'||response.status===401||response.status===403){lock();throw new Error('Your session ended or device access changed. Sign in again.');}
   if(!response.headers.get('Content-Type')?.includes('application/json')){lock();throw new Error('Your session ended. Sign in again.');}
   const result=await response.json();if(!response.ok)throw new Error(result.error||'The request could not be completed.');return result;
 }
@@ -124,7 +129,7 @@ function historyFilters(){
 async function showMemberHistory(id,name){memberFilter={id,name};$('#filterForm').reset();$('#memberFilter').textContent=`Showing history for ${name}. Use Reset to show everyone.`;$('#memberFilter').hidden=false;await navigate('admin');await staffTab('records');}
 async function loadUsers(){
   const result=await api('/api/admin/users',{});users=result.users;renderStats();
-  const box=$('#usersList');box.replaceChildren();for(const user of users){const card=el('article','user-card');card.append(el('h3','',user.full_name||'Profile not yet completed'),el('p','meta',user.email),el('p','meta',`${user.role==='admin'?'Administrator':'Member'} · ${user.enabled?'Enabled':'Disabled'}${user.flight_number?' · Flight '+user.flight_number:''}`));const actions=el('div','actions');actions.append(button('Manage access',()=>manageUser(user)),button('View history',()=>showMemberHistory(user.id,user.full_name||user.email),'text-button'));card.append(actions);box.append(card);}
+  const box=$('#usersList');box.replaceChildren();for(const user of users){const card=el('article','user-card');card.append(el('h3','',user.full_name||'Profile not yet completed'),el('p','meta',user.email||'Member profile'),el('p','meta',`${user.role==='admin'?'Administrator':'Member'} · ${user.enabled?'Enabled':'Disabled'}${user.flight_number?' · Flight '+user.flight_number:''}`));const actions=el('div','actions');actions.append(button('Manage access',()=>manageUser(user)),button('View history',()=>showMemberHistory(user.id,user.full_name||user.email),'text-button'));if(user.enabled)actions.append(button('Connection code',()=>staffConnection(user)));card.append(actions);box.append(card);}
 }
 function renderStats(){if(!state?.counts)return;const c=state.counts,counts=[['On campus',c.on_campus],['Off campus',c.off_campus],['Overdue',c.overdue]];$('#stats').replaceChildren();for(const [label,n]of counts){const item=el('div','stat');item.append(el('strong','',n),el('span','',label));$('#stats').append(item);}if(c.pending){const p=el('p','hint',`${c.pending} approved account${c.pending===1?'':'s'} awaiting profile setup; excluded from campus counts.`);$('#stats').append(p);}}
 async function staffTab(next){staffView=next;for(const b of document.querySelectorAll('[data-staff]'))b.setAttribute('aria-pressed',String(b.dataset.staff===next));$('#staffRecords').hidden=next!=='records';$('#staffUsers').hidden=next!=='users';$('#staffAudit').hidden=next!=='audit';if(next==='records'){adminOffset=0;await loadHistory(true);}if(next==='users')await loadUsers();if(next==='audit'){auditOffset=0;await loadAudit();}}
@@ -141,26 +146,40 @@ function correct(record){
 }
 function manageUser(user){
   const box=modal('Manage member access'),form=el('form','form-stack');form.append(el('p','',user.full_name||user.email));
-  for(const [name,label,options]of [['role','Role',[['member','Member'],['admin','Administrator']]],['enabled','Account access',[['1','Enabled'],['0','Disabled']]]]){const wrap=el('label','',label),select=el('select');select.name=name;for(const [value,caption]of options){const option=el('option','',caption);option.value=value;select.append(option);}select.value=String(user[name]);wrap.append(select);form.append(wrap);}
+  for(const [name,label,options]of [['enabled','Account access',[['1','Enabled'],['0','Disabled']]]]){const wrap=el('label','',label),select=el('select');select.name=name;for(const [value,caption]of options){const option=el('option','',caption);option.value=value;select.append(option);}select.value=String(user[name]);wrap.append(select);form.append(wrap);}
   field(form,'Reason for change','reason','text','',true,240).minLength=3;submit(form,'Save access settings');box.append(form);
-  form.addEventListener('submit',async event=>{event.preventDefault();if(await mutate('user_update',{user_id:user.id,version:user.version,role:form.elements.role.value,enabled:form.elements.enabled.value==='1',reason:form.elements.reason.value}))await loadUsers();});
+  form.addEventListener('submit',async event=>{event.preventDefault();if(await mutate('user_update',{user_id:user.id,version:user.version,role:user.role,enabled:form.elements.enabled.value==='1',reason:form.elements.reason.value}))await loadUsers();});
+}
+async function connectionCode(data={}) {
+  const result=await api('/api/device-code',data),box=modal('Connect an existing profile');
+  box.append(el('p','','On the other device, enter the campus password, then choose “Already have a Tether profile?” and enter this code.'),el('p','hint','This code can be used once and expires in 24 hours. Keep it private.'));
+  const label=el('label','','Connection code'),input=el('input');input.readOnly=true;input.value=result.code;label.append(input);box.append(label,button('Copy code',async()=>{try{await navigator.clipboard.writeText(result.code);dialogError('Code copied.');}catch{input.select();dialogError('Select and copy the code above.');}}));
+}
+function staffConnection(user) {
+  const box=modal('Reconnect member'),form=el('form','form-stack');form.append(el('p','',user.full_name||user.email),el('p','hint','A connection code preserves this member’s profile and history. Reset device access only if their device is lost or no longer trusted.'));
+  const label=el('label','','Device access'),select=el('select');select.name='reset';for(const [value,title]of [['no','Connect another device'],['yes','Reset existing devices']]){const option=el('option','',title);option.value=value;select.append(option);}label.append(select);form.append(label);
+  field(form,'Accountability note','reason','text','',true,240).minLength=3;submit(form,'Create connection code');box.append(form);
+  form.addEventListener('submit',guarded(async event=>{event.preventDefault();await connectionCode({user_id:user.id,reset:select.value==='yes',reason:form.elements.reason.value});}));
 }
 async function refreshStaff(){if(view==='admin'){await loadUsers();await staffTab(staffView);}}
-function guarded(fn){return async event=>{try{await fn(event);}catch(error){notice(error.message,true);}};}
+function guarded(fn){return async event=>{try{await fn(event);}catch(error){if($('#dialog').open)dialogError(error.message);else notice(error.message,true);}};}
 for(const b of document.querySelectorAll('[data-view]'))b.addEventListener('click',()=>navigate(b.dataset.view));
 for(const b of document.querySelectorAll('[data-staff]'))b.addEventListener('click',guarded(()=>staffTab(b.dataset.staff)));
 $('#closeDialog').addEventListener('click',()=>$('#dialog').close());$('#dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault();});
 $('#profileForm').addEventListener('submit',guarded(async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target));data.version=profileVersion;if(await mutate('profile',data))await navigate('home');}));
 $('#filterForm').addEventListener('submit',guarded(async event=>{event.preventDefault();adminOffset=0;await loadHistory(true);}));
 $('#resetFilters').addEventListener('click',guarded(async()=>{$('#filterForm').reset();memberFilter=null;$('#memberFilter').hidden=true;adminOffset=0;await loadHistory(true);}));
-$('#inviteForm').addEventListener('submit',guarded(async event=>{event.preventDefault();if(await mutate('invite',{email:event.target.elements.email.value})){event.target.reset();await loadUsers();}}));
 $('#moreHistory').addEventListener('click',guarded(async()=>{historyOffset+=50;await loadHistory(false,true);}));
 $('#moreAdminHistory').addEventListener('click',guarded(async()=>{adminOffset+=50;await loadHistory(true,true);}));
 $('#moreAudit').addEventListener('click',guarded(async()=>{auditOffset+=50;await loadAudit(true);}));
-$('#logout').addEventListener('click',()=>{lock();retries.clear();});
+if(staffPage)$('#logout').href='/cdn-cgi/access/logout';
+$('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign('/');}lock();retries.clear();}));
+$('#connectDevice').addEventListener('click',guarded(()=>connectionCode()));
+$('#forgetDevice').addEventListener('click',()=>{const box=modal('Forget this device?');box.append(el('p','','Your profile and history will be kept. You will need a connection code from another signed-in device or from staff to reconnect.'));box.append(button('Forget and log out',guarded(async()=>{await api('/api/logout',{forget_device:true});location.assign('/');}),'button primary'));});
 window.addEventListener('offline',()=>{fresh=false;$('#sync').textContent='Offline · status unverified';renderPersonal();notice('You are offline. Reconnect to verify your status before checking in or out.',true);});
 window.addEventListener('online',()=>refresh(true));
 window.addEventListener('pageshow',event=>{if(event.persisted){lock();refresh(true);}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true);});
 setInterval(async()=>{if(document.hidden||busy||document.body.classList.contains('locked'))return;const ok=await refresh();if(ok){renderStats();if(view==='admin'&&!$('#dialog').open&&!$('#staffRecords').contains(document.activeElement)){try{if(staffView==='records'&&adminOffset===0)await loadHistory(true);}catch{}}}if(Date.now()-lastSync>30000){fresh=false;renderPersonal();}},15000);
 await refresh(true);
+if(staffPage&&state)await navigate('admin');

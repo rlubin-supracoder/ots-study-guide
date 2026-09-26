@@ -1,110 +1,112 @@
 # Tether
 
-Private OTS campus accountability at **https://tether.russelllubinski.us**.
+OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.russelllubinski.us/staff.
 
 ## Member workflow
 
-1. Ask staff to approve the exact email you will use to sign in.
-2. Open Tether and enter the email verification code. Complete **Profile** with your full name, flight, room and U.S. phone number.
-3. Select **CHECK OUT**, enter a destination and future return time, review your details, then confirm.
-4. On returning to campus, select **CHECK IN** and confirm. **My history** retains your trips.
+1. Enter the campus password supplied by staff. Members do not use email verification.
+2. On the first device, create a profile with name, flight, room and U.S. phone number.
+3. **CHECK OUT** requires a destination and future return time, followed by confirmation.
+4. **CHECK IN** confirms return to campus. **My history** retains previous trips.
+5. **Profile → Connect another device** generates a private, one-use connection code valid for 24 hours. Enter the campus password on the new device, choose **Already have a Tether profile?**, and enter the code. Existing email profiles need a code from staff; they are not deleted or automatically claimable by name.
 
-The roster refreshes every 15 seconds while the app is visible and immediately after your own changes. All displayed and entered times use **America/Chicago**, even when your phone uses another timezone. Ambiguous or nonexistent daylight-saving transition times are rejected with an explanation. Expected return must be within seven days. Overdue trips remain active until checked in; there is no automatic check-in.
+The roster is visible to members who know the campus password and have completed setup. It refreshes every 15 seconds while visible and after personal changes. Other members' phone numbers are excluded from member API responses. Times are always **America/Chicago**; daylight-saving gaps and ambiguous times are rejected. Expected return must be within seven days. Overdue trips remain active until checked in.
 
-If the connection fails, the app marks the status unverified and disables the main action. It never assumes a failed response means the write did not happen. Reconnect and verify the refreshed status. Retrying the same pending action reuses its request identifier. Refreshing the page retrieves the authoritative server state.
+The password unlock lasts 24 hours. A separate secure cookie remembers the profile for up to one year. **Log out** locks the application but remembers the profile. **Profile → Forget this device** removes the device connection without deleting history. Browser-data clearing requires reconnecting with a code. On a shared phone, forget the device before handing it over.
 
-Use Safari **Share → Add to Home Screen**, or the equivalent browser menu on Android. The manifest and icons support standalone display. There is no service worker or offline personnel-data cache.
+Network failures never imply success: the app marks status unverified, disables the main action, and reconciles with the server. Retried actions reuse their request identifier; refreshing reads authoritative state. There is no GPS collection.
+
+Use the phone browser's **Add to Home Screen** option. The manifest supports standalone display; there is no service worker or offline personnel-data cache.
 
 ## Staff workflow
 
-Sign in at the same address with an approved administrator account, then open **Staff**.
+Open **/staff** and use the designated administrator's email-code sign-in. Staff do not need the campus password.
 
-- **Members → Approve email** allows a new member to sign in. Share the website address separately; Tether does not send invitation emails.
-- **Manage access** enables/disables accounts or promotes another approved member to Administrator. Every change requires a reason and is audited. An active trip must be closed before an account can be disabled. Administrators cannot remove their own access; at least one enabled administrator must remain.
-- **Records** provides search, flight/date/status filters and member-specific history. Date ranges apply to departure dates in Central Time. Results load in pages of 50.
-- **Check member in** records a staff-confirmed return and reason, retaining the trip as `ADMIN_CLOSED`.
-- **Correct record** edits destination or timestamps with a required reason. Clear actual check-in to reopen an erroneous return; the database rejects reopening if another trip is active. The original values, new values, actor, reason and timestamp remain in **Audit trail**.
-- **Contact member** reveals the phone number only to staff. Ordinary members never receive other members’ phone numbers in API responses.
+- **Members → Connection code** reconnects an existing profile. **Reset existing devices** revokes that member's device sessions and outstanding codes before creating a replacement code. A reason is required.
+- **Manage access** enables/disables a member. Close active trips before disabling access. Historical records remain intact.
+- **Records** provides search, flight/date/status filters, and member history in pages of 50. Date filters use Central departure dates.
+- **Check member in** records the staff-confirmed return and reason as ADMIN_CLOSED.
+- **Correct record** edits destination or timestamps with a reason. Clearing actual return reopens a trip only when no other active trip exists. Before/after values, actor, reason and time remain in **Audit trail**.
+- **Contact member** reveals a phone number to staff.
 
-Campus counts include enabled members with completed profiles. Approved accounts awaiting setup are counted separately. Names, flights, rooms and phone numbers are snapshotted when checking out; editing a profile does not rewrite historical trip identity.
+Campus counts include enabled members with completed profiles. Names, flights, rooms and phone numbers are snapshotted at checkout; profile edits do not rewrite historical identities.
 
-## Architecture and authentication
+## Architecture and security
 
-Tether follows the existing Cloudflare Workers deployment model used by the root website and Operation Valor. It is a separate Worker, custom domain and SQLite-backed Durable Object, with no dependency on their data or routes. The interface uses small native JavaScript modules and CSS, matching the root site’s navy and blue styling.
+A separate Cloudflare Worker and SQLite Durable Object follow the root website and Operation Valor deployment model. Native JavaScript/CSS use the existing navy/blue visual identity. Their routes and databases remain independent.
 
-Cloudflare Access protects the entire hostname, including assets and APIs, using the existing email one-time PIN identity provider. The Access application permits verified-email authentication; **Tether’s database allowlist is a second mandatory authorization layer**. A valid Cloudflare token alone does not grant application access. Unapproved or disabled emails receive no app, roster or profile data.
+**Member authentication:** the Worker verifies MEMBER_PASSWORD server-side, issues a random 256-bit gate token and a separate random 256-bit device token, and stores only token hashes. Cookies use the __Host- prefix, Secure, HttpOnly, SameSite=Strict and Path=/. The database checks password version, session expiry and enabled user on every private request. Device authorization is always capped to Member, even for an underlying administrator profile. Setup cannot select or claim another member by name. Connection codes use 128 random bits, are stored hashed, are one-use, and expire after 24 hours. Lost-response retries are supported on the same gate.
 
-The Worker validates the assertion’s RS256 signature, issuer, audience, expiry, subject and email. It checks database membership on every request and checks roles again on every staff operation. `workers.dev` and preview URLs are disabled. There is no production authentication bypass. Local preview identities exist only in `scripts/preview.mjs`, outside the deployed entry point and asset directory.
+**Staff authentication:** Cloudflare Access protects /staff and its subpaths, including /staff/api/*. Its allow policy names only the designated administrator email. The Worker independently validates the Access JWT signature, issuer, audience, expiry, subject and email, then checks the designated email and database administrator role. Email verification alone is not two-factor authentication. Member routes cannot grant staff authority. Access sessions last 24 hours with Secure/HttpOnly cookies.
 
-Access sessions last 24 hours and use its Secure, HTTPOnly cookie with SameSite=Lax. Cloudflare manages email-code abuse protection; Tether additionally enforces persisted per-user limits of 30 mutation attempts and 180 reads per minute. Mutations and private queries require the exact application Origin, a custom request header and JSON. Bodies are limited to 8 KiB. CORS access is not granted.
+Sensitive operations enforce server authorization. Writes require the exact Origin, a custom request header and JSON; bodies are limited to 8 KiB. Persisted limits allow 60 login/setup attempts per source IP per 15 minutes (1,500 globally), 30 user mutations/minute and 180 reads/minute. IP addresses are hashed before storage. Public files contain generic interface code and graphics, not the password or personnel data.
 
-All application responses use `no-store`, HSTS, `noindex/nofollow/noarchive`, a restrictive CSP, no-referrer, clickjacking protection and disabled geolocation/camera/microphone. Inputs are bounded and validated, SQL values are bound, and UI data is rendered as text. There are no analytics, GPS collection, browser-storage profile copies, request-body logs or application console logs. Worker observability is disabled to avoid unintended personnel logging. Audit information is stored privately in the database, not application logs.
+Responses use no-store, HSTS, noindex/nofollow/noarchive, CSP, no-referrer, clickjacking protection and disabled geolocation/camera/microphone. Inputs are validated, SQL values are bound and output is rendered as text. There are no third-party analytics, localStorage profile copies, sensitive request logs or Worker observability. workers.dev and preview URLs are disabled.
 
 ## Data and integrity
 
-The binding `ACCOUNTABILITY` addresses `Accountability`, object name `tether-accountability-v1`. Keep that identity stable across deployments.
+Keep binding **ACCOUNTABILITY**, class **Accountability**, and object name **tether-accountability-v1** stable.
 
 | Table | Purpose |
 | --- | --- |
-| `users` | Unique approved email, required profile when completed, role, enabled flag, revision and timestamps |
-| `checkouts` | Profile snapshot, destination, UTC departure/expected/actual return, status, revision |
-| `audit` | Actor, subject, trip, server timestamp, event and correction details |
-| `requests` | Per-user idempotency key, request hash and committed result; seven-day retention |
-| `limits` | Persisted request-rate counters |
-| `schema_migrations`, `metadata` | Applied migration versions and one-time bootstrap state |
+| users | Profile, account type, role, enabled flag, version and UTC timestamps |
+| checkouts | Profile snapshot, destination, departure/expected/actual return, status and revision |
+| sessions | Hashed gate/device/connection tokens, expiry and password version |
+| audit | Actor, subject, trip, timestamp, event and correction details |
+| requests | Per-user idempotency receipts retained seven days |
+| limits | Persistent request-rate counters |
+| schema_migrations, metadata | Migration versions and one-time bootstrap |
 
-Statuses are `ACTIVE`, `COMPLETED` and `ADMIN_CLOSED`. Corrections retain the operational status and add a `RECORD_CORRECTED` audit event. A partial unique index prohibits more than one `ACTIVE` trip per user. Constraints also enforce valid active/closed timestamp combinations. Status changes, audit entries, user revisions and idempotency receipts commit in one SQLite transaction. All departure/check-in timestamps are server-generated UTC. Expected return is user-selected but validated by the server.
+Device profiles use internal generated email identifiers for compatibility with the original unique-email schema. These identifiers are not exposed by profile/member-list responses and are not real mailboxes.
 
-Optimistic revision checks reject stale checkouts, profile edits and staff corrections. Check-in targets a specific owned trip, so a delayed request cannot close a later trip. Duplicate check-ins succeed without duplicating audit events. A server restart preserves all authoritative data.
+Trip statuses are ACTIVE, COMPLETED and ADMIN_CLOSED. A partial unique index prohibits multiple active trips per user. Mutations, revisions, audit entries and idempotency receipts commit atomically. Server UTC times govern departures and returns; expected return is validated input. Check-in targets a particular owned trip, so a delayed request cannot close a later departure. Revisions reject stale profile, checkout and correction requests. Corrections preserve history.
 
-## Configuration and deployment
+## Deployment and configuration
 
-Use Node.js 24 and pnpm 11. Run commands from `tether/`.
+Use Node.js 24 and pnpm 11 from tether/:
 
-```sh
-pnpm install --frozen-lockfile
-pnpm test
-pnpm build
-pnpm test:runtime
-pnpm deploy
-```
+    pnpm install --frozen-lockfile
+    pnpm test
+    pnpm build
+    pnpm test:runtime
+    pnpm deploy
 
-`pnpm preview` starts a localhost-only synthetic UI harness on port 8791. It is never a production server. `/preview/member` and `/preview/staff` switch local test roles. Runtime tests use Cloudflare’s actual local SQLite runtime and verify persistence across a restart. Test data stays in local memory or ignored `.wrangler/` storage.
+**pnpm preview** runs a localhost-only synthetic harness at port 8791. Its test password is **preview-password**; /staff simulates staff only in this local harness. It is excluded from the Worker and public assets.
 
-`wrangler.jsonc` contains public deployment configuration. `.env.example` lists variable names without values; it is documentation, not automatically loaded by the Worker.
+.env.example contains variable names only. It is documentation, not automatically loaded at runtime.
 
-| Variable | Where / purpose |
+| Variable | Purpose |
 | --- | --- |
-| `APP_ORIGIN` | Wrangler variable: exact HTTPS origin for routing and CSRF |
-| `ACCESS_TEAM_DOMAIN` | Wrangler variable: existing Cloudflare Access issuer |
-| `ACCESS_AUD` | Wrangler variable: Tether’s own Access audience; not Valor’s |
-| `BOOTSTRAP_ADMIN_EMAIL` | **Worker secret**: creates one initial administrator when the database is first initialized |
-| `CLOUDFLARE_ACCOUNT_ID` | Deployment environment, when using a scoped automation token |
-| `CLOUDFLARE_API_TOKEN` | Deployment secret, if using token-based deployment instead of Wrangler OAuth |
-| `CLOUDFLARE_ACCESS_TOKEN_FILE` | Local path to a temporary Access setup token; never a runtime binding |
+| APP_ORIGIN | Exact HTTPS origin; Wrangler variable |
+| ACCESS_TEAM_DOMAIN | Existing Access issuer; Wrangler variable |
+| ACCESS_AUD | Tether staff Access audience; Wrangler variable |
+| BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial bootstrap email and exact authorized staff email |
+| MEMBER_PASSWORD | Worker secret: shared campus password |
+| TETHER_STAFF_EMAIL | Local setup script's designated email; must match bootstrap secret |
+| CLOUDFLARE_ACCOUNT_ID | Account for token-based deployment |
+| CLOUDFLARE_API_TOKEN | Optional deployment token instead of Wrangler OAuth |
+| CLOUDFLARE_ACCESS_TOKEN_FILE | Local temporary Access setup token file |
 
-Provision the initial administrator with `pnpm exec wrangler secret put BOOTSTRAP_ADMIN_EMAIL`. Changing this secret after bootstrap does **not** modify existing administrators. Use **Staff → Members → Manage access** for later promotions.
+Set secrets with **pnpm exec wrangler secret put MEMBER_PASSWORD** and **pnpm exec wrangler secret put BOOTSTRAP_ADMIN_EMAIL**; enter values interactively. Password rotation invalidates gate sessions while retaining profile connections. Never commit secrets or put the password in public assets.
 
-The Access setup script `node scripts/configure-access.mjs` requires a temporary account-scoped token with **Access: Apps and Policies — Edit** and **Access: Organizations, Identity Providers, and Groups — Read**. It only creates/inspects Tether’s own application and updates its audience in the Wrangler configuration. It refuses to overwrite unexpected existing policies. Remove the token file and revoke the temporary token after setup. Runtime operation needs no Cloudflare management token or database password; only the private Durable Object binding can access the database.
+Preserve the existing Tether Access app and audience. **node scripts/configure-access.mjs** reviews the planned scope; add **--apply** to restrict its policy to TETHER_STAFF_EMAIL and move it to /staff. It needs a temporary account-scoped token with **Access: Apps and Policies — Edit**. It refuses unexpected configurations. When migrating from whole-site Access, deploy the password-protected Worker and set its password secret **before** applying the Access change. Delete the local token and revoke/expire it afterward.
 
-Deployment follows the existing manual Wrangler convention. The GitHub workflow runs tests and a bundle check on Tether changes; it does not deploy or need production credentials. Review those checks, then deploy with the authorized Cloudflare account. Do not commit `.dev.vars`, `.env`, credentials, database exports or Wrangler state. `NODE_USE_SYSTEM_CA=1` may be needed on a machine with an enterprise certificate authority; never disable TLS verification.
+GitHub CI runs tests/build/runtime checks without deployment credentials. Deploy with authorized Wrangler credentials. Never commit .dev.vars, .env, database exports or .wrangler state. NODE_USE_SYSTEM_CA=1 may be needed for a corporate CA; never disable TLS verification.
 
-## DNS and HTTPS
+## DNS, migrations and recovery
 
-The Worker custom-domain route owns only `tether.russelllubinski.us`. Cloudflare provisions its DNS routing and managed TLS certificate. The existing zone redirects HTTP to HTTPS; the Worker also enforces HTTPS. The root website and Valor custom domains remain assigned to their original Workers. Do not add a wildcard route or replace their DNS records.
+Only **tether.russelllubinski.us** belongs to this Worker. Cloudflare manages DNS routing, TLS and renewal. The zone and Worker enforce HTTP-to-HTTPS. Do not add wildcard routes or modify root-site/Valor DNS.
 
-Cloudflare Access application: **Tether — OTS Accountability**. It uses the existing account’s Access organization, so the sign-in page may display that organization’s Operation Valor heading.
+001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type without replacing profiles or trips. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
 
-## Migrations, backup and recovery
+The staff route is restricted to one designated email. A database promotion alone does not authorize another email. To transfer administration, arrange an enabled administrator record with an audited migration, update BOOTSTRAP_ADMIN_EMAIL, and update the Access email policy together. Changing the bootstrap secret alone does not replace the existing database account. Members cannot promote themselves.
 
-`migrations/001_initial.sql` defines the initial schema. The Durable Object constructor applies numbered migrations transactionally and records each version in `schema_migrations`. To change the schema, add a new numbered SQL file, import it in `src/worker.mjs`, and append it to the migration list. Never edit an already-applied migration. Test both an empty database and an existing database upgrade before deploying. Wrangler’s `v1` migration creates the SQLite-backed class; future SQL schema changes do not require recreating that class or changing the object name.
+Correct individual errors through **Staff → Records → Correct record**; retain the reason and audit. Use **Connection code → Reset existing devices** for a lost phone.
 
-Cloudflare provides a rolling **30-day point-in-time recovery window** for SQLite-backed Durable Objects. That recovery window is separate from application history, which Tether does not automatically delete. See [Cloudflare’s recovery API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api).
+Cloudflare provides a rolling [30-day SQLite Durable Object recovery window](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#pitr-point-in-time-recovery-api). Before material upgrades, capture a recovery bookmark via an account-controlled maintenance deployment. Disaster recovery requires pausing writes, choosing a bookmark/time, scheduling restoration with onNextSessionRestoreBookmark, retaining its undo bookmark and restarting the object. Verify the roster with staff before reopening writes. There is no public restore/delete endpoint.
 
-Before a material schema upgrade, the deployment operator should capture a current bookmark with `ctx.storage.getCurrentBookmark()` using an account-controlled maintenance procedure. For disaster recovery, temporarily stop accountability writes, choose a bookmark/time in the recovery window, call `onNextSessionRestoreBookmark`, retain its undo bookmark, then restart the object. This is an operator procedure requiring a reviewed maintenance deployment; there is deliberately no web endpoint that restores or erases the entire database. Verify the resulting roster with staff before reopening writes. Never use a whole-database restore to fix one incorrect trip; use the audited staff correction flow.
-
-For retention beyond the recovery window or independent disaster recovery, establish an approved encrypted off-provider backup/export schedule before relying on long-term archives. No off-provider backup schedule is configured by this application. Restrict backup access to authorized operators and never store exports in this public repository. Keep the Cloudflare account’s recovery methods current and maintain a second approved administrator. If the only administrator loses their mailbox, recover that mailbox or have the Cloudflare account owner perform a reviewed, audited administrator-recovery migration; the bootstrap secret cannot silently replace existing access.
+History is not automatically deleted. No off-provider backup schedule is configured. Establish encrypted restricted backups if retention beyond Cloudflare's recovery window is required; never put personnel exports in this repository.
 
 ## Verification
 
-Tests cover membership, signed/forged/expired tokens, role boundaries, CSRF, validation, snapshots, duplicates, concurrent checkout, idempotency, stale devices, manual check-in, correction audit, disabled accounts, database failures, filters, rate limits, Central Time and DST. The runtime test checks real Cloudflare SQLite migrations and restart persistence. Browser checks cover the member/staff workflows, keyboard confirmation and phone/tablet/desktop layouts. Synthetic records are confined to local testing.
+Automated tests cover upgrades, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify state/session persistence across restart. Browser checks cover member/staff workflows and phone/tablet/desktop layouts. Synthetic identities stay local.

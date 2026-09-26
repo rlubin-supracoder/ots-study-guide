@@ -1,33 +1,28 @@
-import {readFile,writeFile} from 'node:fs/promises';
-if (!process.env.CLOUDFLARE_ACCESS_TOKEN_FILE) throw new Error('Set CLOUDFLARE_ACCESS_TOKEN_FILE to the temporary setup token file.');
+import {readFile} from 'node:fs/promises';
+if(!process.env.CLOUDFLARE_ACCESS_TOKEN_FILE||!process.env.TETHER_STAFF_EMAIL)throw new Error('Set CLOUDFLARE_ACCESS_TOKEN_FILE and TETHER_STAFF_EMAIL.');
 const token=(await readFile(process.env.CLOUDFLARE_ACCESS_TOKEN_FILE,'utf8')).trim();
-const configPath=new URL('../wrangler.jsonc',import.meta.url);
-const config=JSON.parse(await readFile(configPath,'utf8'));
-const domain=new URL(config.vars.APP_ORIGIN).hostname;
-async function api(path,body) {
-  const response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.account_id}/access/${path}`,{method:body===undefined?'GET':'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
-  const result=await response.json();if(!result.success)throw new Error(`Access configuration failed (${response.status}): ${JSON.stringify(result.errors)}`);return result.result;
+const config=JSON.parse(await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
+const domain=new URL(config.vars.APP_ORIGIN).hostname,staffDomain=domain+'/staff',email=process.env.TETHER_STAFF_EMAIL.trim().toLowerCase();
+if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Invalid staff email.');
+async function api(path,method='GET',body){
+ const response=await fetch('https://api.cloudflare.com/client/v4/accounts/'+config.account_id+'/access/'+path,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+ const result=await response.json();if(!result.success)throw new Error('Access configuration failed ('+response.status+'): '+JSON.stringify(result.errors));return result.result;
 }
-const organization=await api('organizations');
-if(organization.auth_domain!==config.vars.ACCESS_TEAM_DOMAIN)throw new Error('Unexpected Access organization.');
-const provider=(await api('identity_providers')).find(item=>item.type==='onetimepin');
-if(!provider)throw new Error('Configure an email one-time PIN provider in Cloudflare Access first.');
-const existing=(await api('apps')).filter(item=>item.domain===domain);
-if(existing.length>1)throw new Error('Multiple matching Access applications require review.');
-let app=existing[0];
-if(!app)app=await api('apps',{
-  name:'Tether — OTS Accountability',type:'self_hosted',domain,
-  destinations:[{type:'public',uri:domain}],allowed_idps:[provider.id],auto_redirect_to_identity:true,
-  session_duration:'24h',app_launcher_visible:false,
-  http_only_cookie_attribute:true,same_site_cookie_attribute:'lax',path_cookie_attribute:false,
-  allow_authenticate_via_warp:false,
+const apps=(await api('apps')).filter(a=>a.domain===domain||a.domain===staffDomain);
+if(apps.length!==1)throw new Error('Expected exactly one existing Tether Access application.');
+let app=await api('apps/'+apps[0].id);
+if(app.aud!==config.vars.ACCESS_AUD||app.type!=='self_hosted'||app.allowed_idps?.length!==1)throw new Error('Unexpected application audience, type or identity provider.');
+const policies=await api('apps/'+app.id+'/policies');
+if(policies.length!==1||policies[0].decision!=='allow'||policies[0].reusable)throw new Error('Unexpected policy configuration; review before changing.');
+if(!process.argv.includes('--apply')){console.log(JSON.stringify({current:app.domain,target:staffDomain,policyCount:policies.length,mode:'review'}));process.exit(0);}
+// Restrict staff identity first. Deploy the password-protected Worker before applying this script.
+await api('apps/'+app.id+'/policies/'+policies[0].id,'PUT',{name:'Tether designated administrator',decision:'allow',precedence:1,include:[{email:{email}}],exclude:[],require:[]});
+app=await api('apps/'+app.id,'PUT',{
+ name:'Tether — Staff',type:'self_hosted',domain:staffDomain,destinations:[{type:'public',uri:staffDomain}],
+ allowed_idps:app.allowed_idps,auto_redirect_to_identity:true,session_duration:'24h',app_launcher_visible:false,
+ http_only_cookie_attribute:true,same_site_cookie_attribute:'lax',path_cookie_attribute:true,
+ allow_authenticate_via_warp:false,options_preflight_bypass:false
 });
-const policies=await api(`apps/${app.id}/policies`);
-const include=[{login_method:{id:provider.id}}];
-if(!policies.length)await api(`apps/${app.id}/policies`,{name:'Verified email — membership enforced by Tether',decision:'allow',precedence:1,include,exclude:[],require:[]});
-else if(policies.length!==1||policies[0].decision!=='allow'||JSON.stringify(policies[0].include)!==JSON.stringify(include))throw new Error('Unexpected existing policy; review before changing.');
-app=await api(`apps/${app.id}`);
-if(!app.aud)throw new Error('No audience tag returned.');
-config.vars.ACCESS_AUD=app.aud;
-await writeFile(configPath,JSON.stringify(config,null,2)+'\n');
-console.log(JSON.stringify({appId:app.id,domain,audience:app.aud,session:app.session_duration,configured:true}));
+const verified=await api('apps/'+app.id),verifiedPolicies=await api('apps/'+app.id+'/policies');
+if(verified.domain!==staffDomain||verified.aud!==config.vars.ACCESS_AUD||verifiedPolicies.length!==1||JSON.stringify(verifiedPolicies[0].include)!==JSON.stringify([{email:{email}}]))throw new Error('Configuration verification failed.');
+console.log(JSON.stringify({appId:app.id,domain:verified.domain,audienceUnchanged:true,restrictedToDesignatedEmail:true,configured:true}));

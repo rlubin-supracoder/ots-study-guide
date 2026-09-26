@@ -5,3 +5,5 @@
 @media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f3f7fc;--panel:#fff;--raised:#e6eef8;--text:#102339;--muted:#455d77;--line:#b9c9dc;--accent:#075d94;--ink:#fff;--good:#186547;--warn:#885300;--bad:#9c3c16;--shadow:0 10px 30px #10233908}.button.hero.checkin{color:#fff}.notice,.error{background:#fff8ed}dialog::backdrop{background:#07111f88}}
 
 @media(max-width:600px){.nav{flex-wrap:wrap;overflow:visible}.nav button,.nav a{padding-inline:8px;font-size:.8rem}.base-label{font-size:.58rem}.stats>.hint{grid-column:1/-1}}
+
+#joinForm{margin-top:20px}#connectForm{margin-top:18px}details.panel>summary{cursor:pointer;min-height:44px;padding:8px 0}#unlockForm{max-width:520px}#unlockForm .hero{font-size:1.1rem}label input[readonly]{font-family:monospace;font-size:.9rem}

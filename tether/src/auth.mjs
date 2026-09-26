@@ -15,6 +15,19 @@ export async function verifyToken(token, env, keys) {
   } catch { throw new AppError('Your session has expired. Sign in again.',401); }
 }
 export async function identity(request,env) { return verifyToken(request.headers.get('Cf-Access-Jwt-Assertion'),env); }
+export function randomToken(bytes=32) {return Array.from(crypto.getRandomValues(new Uint8Array(bytes)),b=>b.toString(16).padStart(2,'0')).join('');}
+export async function digest(value) {return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');}
+export function cookieToken(request,name) {
+  const value=request.headers.get('Cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(name+'='))?.slice(name.length+1);
+  return /^[a-f0-9]{64}$/.test(value||'')?value:null;
+}
+export function sessionCookie(kind,token,maxAge) {return `__Host-tether-${kind}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;}
+export async function matchesPassword(value,expected) {
+  if(typeof value!=='string'||value.length>128||!expected)return false;
+  const a=await digest(value),b=await digest(expected);let difference=0;
+  for(let i=0;i<a.length;i++)difference|=a.charCodeAt(i)^b.charCodeAt(i);
+  return difference===0;
+}
 export function csrf(request,env) {
   if (request.headers.get('Origin')!==env.APP_ORIGIN || request.headers.get('X-Tether-Request')!=='1' || request.headers.get('Sec-Fetch-Site')==='cross-site') throw new AppError('Request origin could not be verified.',403);
   if (request.headers.get('Content-Type')?.split(';')[0].trim()!=='application/json') throw new AppError('A JSON request is required.',415);

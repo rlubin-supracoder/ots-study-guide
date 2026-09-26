@@ -21,9 +21,78 @@ export class Database {
   rows(query, ...params) { return Array.from(this.sql.exec(query, ...params)); }
   one(query, ...params) { return this.rows(query, ...params)[0]; }
   authorize(identity) {
-    const user = this.one('SELECT * FROM users WHERE email=? COLLATE NOCASE', email(identity));
+    const member=typeof identity==='object'&&identity!==null;
+    const user = member?this.one('SELECT * FROM users WHERE id=?',id(identity.userId)):this.one('SELECT * FROM users WHERE email=? COLLATE NOCASE', email(identity));
     if (!user?.enabled) throw new AppError('Your account has not been approved or has been disabled. Contact your Tether administrator.', 403);
-    return user;
+    return member?{...user,role:'member'}:user;
+  }
+  loginLimit(client) {
+    const window=Math.floor(Date.parse(this.clock())/900000);
+    for(const [key,max]of [[`login:${client}`,60],['login:global',1500]]) {
+      const row=this.one('SELECT * FROM limits WHERE key=?',key),count=row?.window===window?row.count+1:1;
+      if(count>max)throw new AppError('Too many sign-in attempts. Wait 15 minutes and try again.',429);
+      this.sql.exec('INSERT INTO limits VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET window=excluded.window,count=excluded.count',key,window,count);
+    }
+    this.sql.exec('DELETE FROM limits WHERE key LIKE ? AND window < ?','login:%',window-1);
+  }
+  session(hash,kind) {return hash?this.one('SELECT * FROM sessions WHERE token_hash=? AND kind=? AND expires_at>?',hash,kind,this.clock()):null;}
+  gate(hash,passwordVersion) {
+    const gate=this.session(hash,'gate');
+    if(!gate||!passwordVersion||gate.password_version!==passwordVersion)throw new AppError('Enter the campus password to continue.',401);
+    return gate;
+  }
+  memberPrincipal(gateHash,deviceHash,passwordVersion) {
+    this.gate(gateHash,passwordVersion);
+    const device=this.session(deviceHash,'device');
+    if(!device)throw new AppError('Set up your profile or connect your existing device.',401);
+    const principal={userId:device.user_id};this.authorize(principal);return principal;
+  }
+  createSession(kind,hash,userId=null,passwordVersion=null) {
+    const now=this.clock(),duration=kind==='device'?365*86400000:86400000;
+    this.sql.exec('INSERT INTO sessions(token_hash,kind,user_id,password_version,created_at,expires_at) VALUES (?,?,?,?,?,?)',hash,kind,userId,passwordVersion,now,new Date(Date.parse(now)+duration).toISOString());
+    this.sql.exec('DELETE FROM sessions WHERE expires_at <= ?',now);
+  }
+  join(gateHash,deviceHash,passwordVersion,data,joinHash) {
+    return this.storage.transactionSync(()=>{
+      const gate=this.gate(gateHash,passwordVersion),next=profile(data),now=this.clock();let userId=gate.user_id;
+      if(userId) {
+        if(gate.join_hash!==joinHash)throw new AppError('This setup already completed. Re-enter the original details or connect your existing profile.',409);
+        this.authorize({userId});
+      } else {
+        if(this.one('SELECT id FROM users WHERE lower(full_name)=lower(?) AND lower(flight_number)=lower(?) AND lower(room_number)=lower(?)',next.full_name,next.flight_number,next.room_number))throw new AppError('A profile already uses these details. Use a connection code from your other device or contact staff.',409);
+        if(this.one('SELECT COUNT(*) n FROM users').n>=1000)throw new AppError('The member limit has been reached. Contact staff.',409);
+        userId=crypto.randomUUID();
+        this.sql.exec("INSERT INTO users(id,email,full_name,flight_number,room_number,phone_number,account_type,created_at,updated_at) VALUES (?,?,?,?,?,?,'device',?,?)",userId,`${userId}@members.tether.invalid`,next.full_name,next.flight_number,next.room_number,next.phone_number,now,now);
+        this.sql.exec('UPDATE sessions SET user_id=?,join_hash=? WHERE token_hash=?',userId,joinHash,gateHash);
+        this.audit(userId,userId,null,'MEMBER_REGISTERED',{},now);
+      }
+      this.createSession('device',deviceHash,userId);
+      return {ok:true};
+    });
+  }
+  issueConnection(user,hash,targetId=user.id,reason=null) {
+    return this.storage.transactionSync(()=>{
+      if(targetId!==user.id)admin(user);
+      const target=this.authorize({userId:targetId}),now=this.clock();
+      if(reason) {
+        admin(user);reason=text(reason,'Reason',240,3);
+        this.sql.exec("DELETE FROM sessions WHERE user_id=? AND kind IN ('device','connect','gate')",target.id);
+      } else this.sql.exec("DELETE FROM sessions WHERE user_id=? AND kind='connect'",target.id);
+      this.createSession('connect',hash,target.id);
+      this.audit(user.id,target.id,null,reason?'MEMBER_ACCESS_RESET':'DEVICE_CODE_CREATED',reason?{reason}:{},now);
+    });
+  }
+  connect(gateHash,deviceHash,passwordVersion,codeHash) {
+    return this.storage.transactionSync(()=>{
+      const gate=this.gate(gateHash,passwordVersion);
+      const code=this.session(codeHash,'connect');
+      // A lost response may be retried from the same authenticated browser gate.
+      const userId=code?.user_id||(gate.join_hash===codeHash?gate.user_id:null);
+      if(!userId)throw new AppError('That connection code is invalid, expired or already used.',401);
+      this.authorize({userId});this.createSession('device',deviceHash,userId);
+      if(code){this.sql.exec('DELETE FROM sessions WHERE token_hash=?',codeHash);this.sql.exec('UPDATE sessions SET user_id=?,join_hash=? WHERE token_hash=?',userId,codeHash,gateHash);this.audit(userId,userId,null,'DEVICE_CONNECTED',{},this.clock());}
+      return {ok:true};
+    });
   }
   audit(actor, subject, record, action, detail, at) {
     this.sql.exec('INSERT INTO audit(actor_id,subject_id,record_id,action,at,detail) VALUES (?,?,?,?,?,?)', actor, subject, record, action, at, JSON.stringify(detail));
@@ -40,7 +109,7 @@ export class Database {
     const active = this.one('SELECT * FROM checkouts WHERE user_id=? AND status=?', user.id, 'ACTIVE') || null;
     const fields = rosterFields + (user.role === 'admin' ? ',phone_number' : '');
     const roster=this.rows(`SELECT ${fields} FROM checkouts WHERE status='ACTIVE' ORDER BY expected_return_at,checked_out_at`);
-    const result={user,active,profile_complete:complete(user),roster,server_time:now};
+    const result={user:{...user,email:user.account_type==='device'?null:user.email},active,profile_complete:complete(user),roster,server_time:now};
     if(user.role==='admin') {
       const ready=this.one('SELECT COUNT(*) AS n FROM users WHERE enabled=1 AND full_name IS NOT NULL').n;
       result.counts={on_campus:ready-roster.length,off_campus:roster.length,overdue:roster.filter(r=>r.expected_return_at<now).length,pending:this.one('SELECT COUNT(*) AS n FROM users WHERE enabled=1 AND full_name IS NULL').n};
@@ -72,7 +141,7 @@ export class Database {
   }
   users(user) {
     admin(user);
-    return this.rows("SELECT u.*, c.id AS active_id FROM users u LEFT JOIN checkouts c ON c.user_id=u.id AND c.status='ACTIVE' ORDER BY u.enabled DESC,u.full_name,u.email");
+    return this.rows("SELECT u.*, c.id AS active_id FROM users u LEFT JOIN checkouts c ON c.user_id=u.id AND c.status='ACTIVE' ORDER BY u.enabled DESC,u.full_name,u.email").map(u=>({...u,email:u.account_type==='device'?null:u.email}));
   }
   auditHistory(user, body) {
     admin(user);
@@ -80,7 +149,7 @@ export class Database {
     if (!Number.isInteger(offset) || offset < 0 || offset > 1000000) throw new AppError('Invalid page.');
     const where = body.user_id ? 'WHERE a.subject_id=?' : '';
     const params = body.user_id ? [id(body.user_id)] : [];
-    const records = this.rows(`SELECT a.*, u.email AS actor_email, s.full_name AS subject_name FROM audit a LEFT JOIN users u ON a.actor_id=u.id LEFT JOIN users s ON a.subject_id=s.id ${where} ORDER BY a.id DESC LIMIT 51 OFFSET ?`, ...params, offset);
+    const records = this.rows(`SELECT a.*, CASE WHEN u.account_type='device' THEN u.full_name ELSE u.email END AS actor_email, s.full_name AS subject_name FROM audit a LEFT JOIN users u ON a.actor_id=u.id LEFT JOIN users s ON a.subject_id=s.id ${where} ORDER BY a.id DESC LIMIT 51 OFFSET ?`, ...params, offset);
     return { records: records.slice(0,50), more: records.length > 50, offset };
   }
   mutate(identity, body, fingerprint) {
