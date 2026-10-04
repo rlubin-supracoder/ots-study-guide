@@ -1,0 +1,6 @@
+{
+  "name": "ops-sheet-summary", "version": "1.0.0", "private": true, "type": "module",
+  "scripts": {"test":"node --test test/*.test.mjs", "test:runtime":"node scripts/runtime-test.mjs", "build":"node scripts/build.mjs", "deploy":"wrangler deploy", "dev":"wrangler dev --port 8792 --var APP_ORIGIN:http://127.0.0.1:8792"},
+  "dependencies": {"fflate":"0.8.3", "fast-xml-parser":"5.11.2", "jose":"6.2.12"},
+  "devDependencies": {"wrangler":"4.135.0", "esbuild":"0.25.10"}
+}

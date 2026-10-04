@@ -1,0 +1,15 @@
+{
+  "$schema":"node_modules/wrangler/config-schema.json",
+  "name":"ops-sheet-summary",
+  "account_id":"930c639ccd874fcb5c1de90de6d61363",
+  "main":"src/worker.mjs",
+  "compatibility_date":"2026-09-25",
+  "workers_dev":false, "preview_urls":false,
+  "routes":[{"pattern":"ops.russelllubinski.us","custom_domain":true}],
+  "assets":{"directory":"./public","binding":"ASSETS","run_worker_first":true,"html_handling":"none"},
+  "durable_objects":{"bindings":[{"name":"SHEETS","class_name":"SheetMonitor"}]},
+  "migrations":[{"tag":"v1","new_sqlite_classes":["SheetMonitor"]}],
+  "vars":{"APP_ORIGIN":"https://ops.russelllubinski.us","LIVE_ENABLED":"false"},
+  "triggers":{"crons":[]},
+  "observability":{"enabled":false}
+}
