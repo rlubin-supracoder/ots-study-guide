@@ -9,7 +9,7 @@ OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.r
 | 27-01 | https://tether.russelllubinski.us/ | https://tether.russelllubinski.us/staff |
 | 27-02 | https://tether.russelllubinski.us/class/27-02/ | https://tether.russelllubinski.us/staff/class/27-02 |
 
-The common sign-in page recognizes either class password. Class links at the top switch spaces. Each class has separate profiles, sessions, PIN recovery, connection codes, rosters, history and audit records. The same approved staff emails can administer both, with each screen explicitly labeled by class. Corrections affect only the selected class. A flight number is a profile field, not a class selection or authorization mechanism.
+The common sign-in page recognizes either class password. Class links at the top switch spaces. Each class has separate profiles, sessions, PIN recovery, connection codes, rosters, history and audit records. Global staff can administer both classes. Class-specific staff can administer only their assigned class, with each screen explicitly labeled. Both the Worker and database service enforce the class allowlist; the navigation shows only authorized staff classes. Corrections affect only the selected class. A flight number is a profile field, not a class selection or authorization mechanism.
 
 27-01 retains its original database, cookies, password secret and polling behavior. No records are moved, reset or rewritten to add 27-02. Both class connections can coexist on one device; logging out or forgetting one class does not remove the other connection. Install 27-02 from its own member link to retain that class in its home-screen shortcut.
 
@@ -33,7 +33,7 @@ Use the phone browser's **Add to Home Screen** option. The manifest supports sta
 
 ## Staff workflow
 
-Open **/staff** and use an approved staff email for email-code sign-in. Staff do not need the campus password. New staff complete their own profile before checking out; staff tools are available immediately.
+Open **/staff** and use an approved staff email for email-code sign-in. Staff do not need the campus password. Class-27-02-only staff should use **/staff/class/27-02**; the generic /staff page redirects them there after sign-in. Their administrator profile is provisioned on first authorized access in 27-02 only. New staff complete their own profile before checking out; staff tools are available immediately.
 
 - **Members → Connection code** reconnects an existing profile. **Reset devices and PIN** revokes that member's device sessions, outstanding codes and PIN before creating a replacement code. A reason is required. The member creates a new PIN after reconnecting, before their next checkout.
 - **Manage access** enables/disables a member. Close active trips before disabling access. Historical records remain intact.
@@ -98,7 +98,8 @@ Use Node.js 24 and pnpm 11 from tether/:
 | ACCESS_TEAM_DOMAIN | Existing Access issuer; Wrangler variable |
 | ACCESS_AUD | Tether staff Access audience; Wrangler variable |
 | BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial administrator, always included in the staff email list |
-| STAFF_EMAILS | Worker secret: comma-separated additional approved staff emails |
+| STAFF_EMAILS | Worker secret: additional global staff emails with access to both classes |
+| STAFF_EMAILS_27_02 | Worker secret: staff emails authorized only for class 27-02 |
 | MEMBER_PASSWORD | Worker secret: original 27-01 campus password; retain unchanged |
 | MEMBER_PASSWORD_27_02 | Worker secret: 27-02 campus password |
 | PIN_PEPPER | Worker secret: 64 hexadecimal characters generated from 32 random bytes; protect and retain this key |
@@ -125,7 +126,9 @@ Only **tether.russelllubinski.us** belongs to this Worker. Cloudflare manages DN
 
 To add staff, preserve existing additional addresses and update the STAFF_EMAILS Worker secret with **pnpm exec wrangler secret put STAFF_EMAILS**. Deploy or activate the updated configuration; the Durable Object creates/promotes each newly configured staff account once, preserving existing records and adding an audit event. Set TETHER_STAFF_EMAILS to the complete list, including BOOTSTRAP_ADMIN_EMAIL, and apply the Access configuration script. Verify the account in **Staff → Members**. No mailbox address belongs in public source. A database promotion alone does not grant staff access, and members cannot promote themselves.
 
-To revoke staff access, remove the email from both the Worker secret and Access policy, then disable its account if all member access should also end. Existing JWTs are denied immediately by the Worker's email check after configuration propagation. Disabled accounts remain disabled across deployments and must be deliberately enabled in **Manage access**. Preserve the original administrator unless an administration transfer is explicitly intended.
+For staff restricted to 27-02, add the address to **STAFF_EMAILS_27_02**, preserving its existing entries. Do not add it to global STAFF_EMAILS. The Cloudflare Access allow policy must include the union of global and class-specific staff; it authenticates identity while the Worker independently restricts class access. Preserve the Access app audience, routes and existing policy conditions. Never broaden access using an email-domain or Everyone rule. The constructor provisions only global staff; class-specific accounts are provisioned once after an authorized request to their class. Disabled accounts remain disabled.
+
+To revoke staff access, remove the email from the applicable Worker secret and Access policy, then disable its account if all member access should also end. Existing JWTs are denied immediately by the Worker's email check after configuration propagation. Disabled accounts remain disabled across deployments and must be deliberately enabled in **Manage access**. Preserve the original administrator unless an administration transfer is explicitly intended.
 
 Correct individual errors through **Staff → Records → Correct record**; retain the reason and audit. Use **Connection code → Reset devices and PIN** for a lost phone.
 
@@ -135,7 +138,7 @@ History is not automatically deleted. No off-provider backup schedule is configu
 
 ## Verification
 
-Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Synthetic identities stay local. The class extension passes 47 unit/security tests and the original runtime suite. Its local Cloudflare capacity test registers 200 members behind one IP, holds 200 authenticated live connections, performs 200 simultaneous roster reads and complete checkout/check-in cycles, checks isolation, and confirms both classes survive restart plus PIN reconnection. The initial run completed 1,415 requests with p95 1.96 seconds on the local Windows runtime; this is a local test, not a production performance guarantee. New browser visual checks could not run because the browser-control tool failed to initialize; class navigation uses the existing responsive styles and 44-pixel targets.
+Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Synthetic identities stay local. The class extension passes 53 unit/security tests, including signed-JWT class-specific staff authorization, denied cross-class requests, preserved global access and disabled-account handling and the original runtime suite. Its local Cloudflare capacity test registers 200 members behind one IP, holds 200 authenticated live connections, performs 200 simultaneous roster reads and complete checkout/check-in cycles, checks isolation, and confirms both classes survive restart plus PIN reconnection. The initial run completed 1,415 requests with p95 1.96 seconds on the local Windows runtime; this is a local test, not a production performance guarantee. New browser visual checks could not run because the browser-control tool failed to initialize; class navigation uses the existing responsive styles and 44-pixel targets.
 
 
 ## Capacity and live updates

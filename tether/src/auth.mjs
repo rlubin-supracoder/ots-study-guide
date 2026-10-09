@@ -1,13 +1,17 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { AppError, email } from './validation.mjs';
+import { CLASSES,classFor } from './classes.mjs';
 const keySets = new Map();
-export function staffEmails(env) {
+export function staffEmails(env,classId='27-01') {
   try {
+    classFor(classId);
     const additional=env.STAFF_EMAILS?env.STAFF_EMAILS.split(','):[];
-    return [...new Set([env.BOOTSTRAP_ADMIN_EMAIL,...additional].filter(v=>v?.trim()).map(email))];
+    const scoped=classId==='27-02'&&env.STAFF_EMAILS_27_02?env.STAFF_EMAILS_27_02.split(','):[];
+    return [...new Set([env.BOOTSTRAP_ADMIN_EMAIL,...additional,...scoped].filter(v=>v?.trim()).map(email))];
   } catch {throw new AppError('Staff sign-in configuration is unavailable.',503);}
 }
-export function isStaffEmail(value,env) {return staffEmails(env).includes(email(value));}
+export function isStaffEmail(value,env,classId='27-01') {return staffEmails(env,classId).includes(email(value));}
+export function staffClasses(value,env) {return Object.keys(CLASSES).filter(classId=>isStaffEmail(value,env,classId));}
 export async function verifyToken(token, env, keys) {
   if (!env.ACCESS_AUD || !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(env.ACCESS_TEAM_DOMAIN || '')) throw new AppError('Sign-in is temporarily unavailable.',503);
   if (!token) throw new AppError('Your session has expired. Sign in again.',401);

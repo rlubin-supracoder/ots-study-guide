@@ -1,5 +1,5 @@
 import { AppError,admin,profile,id,text,phone } from './validation.mjs';
-import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail } from './auth.mjs';
+import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail,staffClasses } from './auth.mjs';
 import {confirmedPin,pinValue,hashPin,pinFingerprint,sameHash} from './pin.mjs';
 import { json,failure } from './http.mjs';
 import { classFor } from './classes.mjs';
@@ -58,13 +58,15 @@ export async function databaseRequest(db,request,env={},liveConnect) {
     let actor;
     if(staff){
       actor=request.headers.get('X-Verified-Email');
-      if(!actor||!isStaffEmail(actor,env))throw new AppError('Staff access denied.',403);
+      if(!actor||!isStaffEmail(actor,env,classroom.id))throw new AppError('Staff access denied.',403);
+      // Provision class-specific staff only after verifying that class's allowlist.
+      db.provisionStaff([actor]);
     }else actor=db.memberPrincipal(gateHash,deviceHash,passwordVersion);
     const user=db.authorize(actor);if(staff)admin(user);
     db.limit(user,['/api/action','/api/device-code','/api/profile-pin'].includes(path),scaled);
     if(path==='/api/live'&&method==='GET'&&!staff&&scaled&&liveConnect)return liveConnect({userId:user.id,gateHash,deviceHash,passwordVersion});
     if (path==='/access') return json({ok:true});
-    if (path==='/api/state' && method==='GET') return json({...db.state(user,scaled),class_id:classroom.id});
+    if (path==='/api/state' && method==='GET') return json({...db.state(user,scaled),class_id:classroom.id,...(staff?{staff_classes:staffClasses(actor,env)}:{})});
     if (method!=='POST') throw new AppError('Method not allowed.',405);
     if(path==='/api/profile-pin') {
       const value=confirmedPin(body),existing=db.pinRecord(user.id);

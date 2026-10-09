@@ -1,4 +1,4 @@
-import { identity,csrf,bodyOf,cookieToken,digest,isStaffEmail,matchesPassword } from './auth.mjs';
+import { identity,csrf,bodyOf,cookieToken,digest,isStaffEmail,staffClasses,matchesPassword } from './auth.mjs';
 import { AppError } from './validation.mjs';
 import { CLASSES,routeClass } from './classes.mjs';
 export const securityHeaders={
@@ -27,12 +27,16 @@ export async function serveRequest(request,env,authenticate=identity) {
       return new Response(response.body,{status:response.status,headers:{...Object.fromEntries(response.headers),...securityHeaders}});
     }
     if(publicAssets.has(url.pathname)&&['GET','HEAD'].includes(request.method))return asset(url.pathname);
+    let {classroom,path}=routeClass(staff?url.pathname.slice('/staff'.length)||'/':url.pathname);
     let actor;
     if(staff) {
       actor=await authenticate(request,env);
-      if(!isStaffEmail(actor.email,env))throw new AppError('This staff page is restricted to approved administrators.',403);
+      if(!isStaffEmail(actor.email,env,classroom.id)){
+        const allowed=staffClasses(actor.email,env);
+        if(['GET','HEAD'].includes(request.method)&&['/staff','/staff/'].includes(url.pathname)&&allowed.length)return new Response(null,{status:303,headers:{...securityHeaders,Location:'/staff'+CLASSES[allowed[0]].prefix}});
+        throw new AppError('You do not have staff access to this class.',403);
+      }
     }
-    let {classroom,path}=routeClass(staff?url.pathname.slice('/staff'.length)||'/':url.pathname);
     const isApi=path.startsWith('/api/');
     const body=request.method==='POST'?(csrf(request,env),await bodyOf(request)):null;
     // The common sign-in page accepts either class password; explicit class URLs stay class-specific.

@@ -8,7 +8,7 @@ const {Miniflare,convertV4MiniflareOptions}=wranglerRequire('miniflare');
 const root=path.resolve('dist'),sql=(await readdir(root)).filter(f=>f.endsWith('.sql'));
 const runId=crypto.randomUUID().slice(0,8),persist=path.resolve('.wrangler','runtime-'+runId);
 const port=await new Promise(resolve=>{const server=createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});});
-const options={name:'tether-runtime-'+runId,port,unsafeDevRegistryPath:path.join(persist,'registry'),compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',PIN_PEPPER:'a'.repeat(64),APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
+const options={name:'tether-runtime-'+runId,port,unsafeDevRegistryPath:path.join(persist,'registry'),compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',STAFF_EMAILS_27_02:'class-staff@example.test',MEMBER_PASSWORD:'runtime-password',PIN_PEPPER:'a'.repeat(64),APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
 const runtimeOptions={...convertV4MiniflareOptions(options),resourcePersistencePath:persist,telemetry:{enabled:false}};
 let mf=new Miniflare(runtimeOptions);
 async function client(){const ns=await mf.getDurableObjectNamespace('ACCOUNTABILITY');return ns.get(ns.idFromName('tether-accountability-v1'));}
@@ -18,7 +18,15 @@ async function call(email,path,body,method=body===undefined?'GET':'POST'){
   return {status:response.status,data:await response.json()};
 }
 const action=(email,action,data,request_id=crypto.randomUUID())=>call(email,'/api/action',{action,data,request_id});
+async function scopedState(){
+  const ns=await mf.getDurableObjectNamespace('ACCOUNTABILITY'),next=ns.get(ns.idFromName('tether-accountability-class-27-02-v1'));
+  const response=await next.fetch('https://internal/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Tether-Mode':'staff','X-Tether-Class':'27-02','X-Verified-Email':'class-staff@example.test'},body:JSON.stringify({method:'GET'})});
+  assert.equal(response.status,200);return response.json();
+}
 try{
+  const scoped=await scopedState();assert.equal(scoped.user.role,'admin');assert.deepEqual(scoped.staff_classes,['27-02']);
+  assert.equal((await call('class-staff@example.test','/api/state')).status,403);
+  assert.equal((await call('staff@example.test','/api/admin/users',{})).data.users.some(user=>user.email==='class-staff@example.test'),false);
   assert.equal((await mf.dispatchFetch('https://tether.test/api/state')).status,401);
   assert.equal((await call('unapproved@example.test','/api/state')).status,403);
   assert.equal((await call('second@example.test','/api/state')).data.user.role,'admin');
@@ -33,6 +41,7 @@ try{
   assert.equal(results.filter(r=>r.status===409).length,19);
   const active=(await call('staff@example.test','/api/state')).data.active;
   await mf.dispose();mf=new Miniflare(runtimeOptions);stub=await client();
+  assert.equal((await scopedState()).user.id,scoped.user.id);
   assert.equal((await call('staff@example.test','/api/state')).data.active.id,active.id);
   assert.equal((await call('second@example.test','/api/admin/users',{})).data.users.filter(user=>user.email==='second@example.test').length,1);
   assert.equal((await action('staff@example.test','checkin',{record_id:active.id})).status,200);

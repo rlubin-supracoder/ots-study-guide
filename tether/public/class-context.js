@@ -11,6 +11,7 @@ for(const node of document.querySelectorAll('[data-class-link]')){
   const target=node.dataset.classLink;
   node.href=(staffPage?'/staff':'')+(target==='27-02'?'/class/27-02':'')+(staffPage?'':'/');
   if(target===classId)node.setAttribute('aria-current','page');
+  if(staffPage&&target!==classId)node.hidden=true;
 }
 document.title=`Tether · Class ${classId}${staffPage?' · Staff':''}`;
 if(classId==='27-02'){

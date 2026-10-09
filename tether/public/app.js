@@ -73,6 +73,7 @@ async function refresh(force=false){
   refreshPromise=(async()=>{try{
     const next=await api('/api/state');if(next.class_id!==classId){lock();throw new Error('Class could not be verified. Sign in again.');}serverOffset=Date.parse(next.server_time)-Date.now();lastSync=Date.now();fresh=true;document.body.classList.remove('locked');$('#authError').hidden=true;
     const changed=JSON.stringify([next.user,next.active])!==JSON.stringify([state?.user,state?.active]);state=next;$('#adminNav').hidden=state.user.role!=='admin';
+    if(staffPage)for(const link of document.querySelectorAll('[data-class-link]'))link.hidden=!state.staff_classes?.includes(link.dataset.classLink);
     $('#profilePinButton').textContent=state.user.has_pin?'Change profile PIN':'Create profile PIN';
     $('#pinStatus').textContent=state.user.pin_locked?'PIN recovery is locked after unsuccessful attempts. Set a new PIN here to unlock it.':state.user.has_pin?'Your PIN is set. Use it with your full name and phone number to reconnect on another device.':'Create your four-digit PIN before your next checkout. Your profile and checkout history will stay the same.';
     if(view==='admin'&&state.user.role!=='admin')navigate('home');
