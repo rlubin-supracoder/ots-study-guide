@@ -2,6 +2,17 @@
 
 OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.russelllubinski.us/staff.
 
+## Classes
+
+| Class | Member link | Staff link |
+| --- | --- | --- |
+| 27-01 | https://tether.russelllubinski.us/ | https://tether.russelllubinski.us/staff |
+| 27-02 | https://tether.russelllubinski.us/class/27-02/ | https://tether.russelllubinski.us/staff/class/27-02 |
+
+The common sign-in page recognizes either class password. Class links at the top switch spaces. Each class has separate profiles, sessions, PIN recovery, connection codes, rosters, history and audit records. The same approved staff emails can administer both, with each screen explicitly labeled by class. Corrections affect only the selected class. A flight number is a profile field, not a class selection or authorization mechanism.
+
+27-01 retains its original database, cookies, password secret and polling behavior. No records are moved, reset or rewritten to add 27-02. Both class connections can coexist on one device; logging out or forgetting one class does not remove the other connection. Install 27-02 from its own member link to retain that class in its home-screen shortcut.
+
 ## Member workflow
 
 1. Enter the campus password supplied by staff. Members do not use email verification.
@@ -12,7 +23,7 @@ OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.r
 
 **Profile → Create/Change profile PIN** sets or changes your PIN from an authenticated device. PINs retain leading zeroes and never appear in staff lists or logs. Five unsuccessful attempts lock PIN recovery across devices until you set a new PIN from a connected device. This does not block check-in/out or connection codes. Forgotten PINs can be replaced after reconnecting with a code. Recovery requires a unique match for full name and contact number; ambiguous matches use the connection-code fallback.
 
-The roster is visible to members who know the campus password and have completed setup. It refreshes every 15 seconds while visible and after personal changes. Other members' phone numbers are excluded from member API responses. Times are always **America/Chicago**; daylight-saving gaps and ambiguous times are rejected. Expected return must be within seven days. Overdue trips remain active until checked in.
+The roster is visible only within the authenticated class after profile setup. 27-01 and staff views refresh every 15 seconds while visible. 27-02 members use authenticated live notifications, with five-minute reconciliation and 15-second polling if the live connection is unavailable. Personal changes always reconcile immediately. Other members' phone numbers are excluded from member API responses. Times are always **America/Chicago**; daylight-saving gaps and ambiguous times are rejected. Expected return must be within seven days. Overdue trips remain active until checked in.
 
 The password unlock lasts 24 hours. A separate secure cookie remembers the profile for up to one year. **Log out** locks the application but remembers the profile. **Profile → Forget this device** removes the device connection without deleting history. Browser-data clearing requires reconnecting with a PIN or connection code. On a shared phone, forget the device before handing it over.
 
@@ -37,19 +48,19 @@ Campus counts include enabled members with completed profiles. Names, flights, r
 
 A separate Cloudflare Worker and SQLite Durable Object follow the root website and Operation Valor deployment model. Native JavaScript/CSS use the existing navy/blue visual identity. Their routes and databases remain independent.
 
-**Member authentication:** the Worker verifies MEMBER_PASSWORD server-side, issues a random 256-bit gate token and a separate random 256-bit device token, and stores only token hashes. Cookies use the __Host- prefix, Secure, HttpOnly, SameSite=Strict and Path=/. The database checks password version, session expiry and enabled user on every private request. Device authorization is always capped to Member, even for an underlying administrator profile. Setup cannot select or claim another member by name. Connection codes use 128 random bits, are stored hashed, are one-use, and expire after 24 hours. Lost-response retries are supported on the same gate.
+**Member authentication:** the Worker verifies the selected class password server-side, issues a random 256-bit gate token and a separate random 256-bit device token, and stores only token hashes. Cookies use the __Host- prefix, Secure, HttpOnly, SameSite=Strict and Path=/. The database checks password version, session expiry and enabled user on every private request. Device authorization is always capped to Member, even for an underlying administrator profile. Setup cannot select or claim another member by name. Connection codes use 128 random bits, are stored hashed, are one-use, and expire after 24 hours. Lost-response retries are supported on the same gate.
 
 Profile PINs are hashed with PBKDF2-SHA256 (100,000 iterations), a random 128-bit salt, and a separate 256-bit Worker secret used for HMAC preprocessing. The secret is not stored in the database. PIN credentials live in a separate table and never leave the server. PIN attempts require the campus password, share the login IP/global limits, and reserve one of five account attempts transactionally before verification, so parallel requests cannot evade lockout. Identity, enabled status and PIN revision are rechecked before issuing a member-only device session. Staff still require their approved email and Cloudflare Access verification.
 
 **Staff authentication:** Cloudflare Access protects /staff and its subpaths, including /staff/api/*. Its allow policy names only approved staff emails. The Worker independently validates the Access JWT signature, issuer, audience, expiry, subject and email, then checks its own approved email list and an enabled database administrator role. The original bootstrap administrator remains included alongside STAFF_EMAILS. Newly configured staff accounts are created or promoted once with a STAFF_APPROVED audit event; subsequent deployments do not re-enable disabled accounts or overwrite profiles and history. Email verification alone is not two-factor authentication. Member routes cannot grant staff authority. Access sessions last 24 hours with Secure/HttpOnly cookies.
 
-Sensitive operations enforce server authorization. Writes require the exact Origin, a custom request header and JSON; bodies are limited to 8 KiB. Persisted limits allow 60 login/setup attempts per source IP per 15 minutes (1,500 globally), 30 user mutations/minute and 180 reads/minute. IP addresses are hashed before storage. Public files contain generic interface code and graphics, not the password or personnel data.
+Sensitive operations enforce server authorization. Writes require the exact Origin, a custom request header and JSON; bodies are limited to 8 KiB. Persisted limits allow 60 incorrect login attempts per source IP per 15 minutes (1,500 globally), 30 user mutations/minute and 180 reads/minute. 27-01 retains its existing combined sign-in/setup limit. For 27-02, verified-password sign-ins and authenticated setups use a separate 600-per-IP/1,500-global allowance per 15 minutes so 200 members can join on shared Wi-Fi. Failed PIN attempts remain capped at five per profile. New-class read throttles are in memory and may reset on hibernation; authentication, PIN and mutation limits remain persistent. All limits are per class. IP addresses are hashed before storage. Public files contain generic interface code and graphics, not the password or personnel data.
 
 Responses use no-store, HSTS, noindex/nofollow/noarchive, CSP, no-referrer, clickjacking protection and disabled geolocation/camera/microphone. Inputs are validated, SQL values are bound and output is rendered as text. There are no third-party analytics, localStorage profile copies, sensitive request logs or Worker observability. workers.dev and preview URLs are disabled.
 
 ## Data and integrity
 
-Keep binding **ACCOUNTABILITY**, class **Accountability**, and object name **tether-accountability-v1** stable.
+Keep binding **ACCOUNTABILITY** and class **Accountability** stable. Permanent object names: **tether-accountability-v1** for 27-01, **tether-accountability-class-27-02-v1** for 27-02. Legacy cookies retain their names; 27-02 gate/device cookies use the **-27-02** suffix. Class routing is server-controlled and allowlisted. The 27-02 addition requires no new migration and reuses the existing schema in a separate SQLite object.
 
 | Table | Purpose |
 | --- | --- |
@@ -74,9 +85,10 @@ Use Node.js 24 and pnpm 11 from tether/:
     pnpm test
     pnpm build
     pnpm test:runtime
+    pnpm test:capacity
     pnpm deploy
 
-**pnpm preview** runs a localhost-only synthetic harness at port 8791. Its test password is **preview-password**; /staff simulates staff only in this local harness. It is excluded from the Worker and public assets.
+**pnpm preview** runs a localhost-only synthetic harness at port 8791. Its test passwords are **preview-password** for 27-01 and **preview-new-password** for 27-02; /staff simulates staff only in this local harness. It is excluded from the Worker and public assets.
 
 .env.example contains variable names only. It is documentation, not automatically loaded at runtime.
 
@@ -87,7 +99,8 @@ Use Node.js 24 and pnpm 11 from tether/:
 | ACCESS_AUD | Tether staff Access audience; Wrangler variable |
 | BOOTSTRAP_ADMIN_EMAIL | Worker secret: initial administrator, always included in the staff email list |
 | STAFF_EMAILS | Worker secret: comma-separated additional approved staff emails |
-| MEMBER_PASSWORD | Worker secret: shared campus password |
+| MEMBER_PASSWORD | Worker secret: original 27-01 campus password; retain unchanged |
+| MEMBER_PASSWORD_27_02 | Worker secret: 27-02 campus password |
 | PIN_PEPPER | Worker secret: 64 hexadecimal characters generated from 32 random bytes; protect and retain this key |
 | TETHER_STAFF_EMAILS | Local setup script's complete staff list: bootstrap plus additional emails |
 | CLOUDFLARE_ACCOUNT_ID | Account for token-based deployment |
@@ -95,6 +108,8 @@ Use Node.js 24 and pnpm 11 from tether/:
 | CLOUDFLARE_ACCESS_TOKEN_FILE | Local temporary Access setup token file |
 
 Set secrets with **pnpm exec wrangler secret put MEMBER_PASSWORD** and **pnpm exec wrangler secret put BOOTSTRAP_ADMIN_EMAIL**; enter values interactively. Password rotation invalidates gate sessions while retaining profile connections. Never commit secrets or put the password in public assets.
+
+Before enabling 27-02, set **pnpm exec wrangler secret put MEMBER_PASSWORD_27_02** using the staff-supplied password. Leave MEMBER_PASSWORD, PIN_PEPPER, Access audience, staff secrets, routes and Durable Object bindings unchanged. No Access policy or DNS update is needed for the new class. Roll back the Worker deployment if needed; keep both object names stable so rollback does not delete either class’s records.
 
 Before deploying PIN support, generate a cryptographically random 32-byte secret and store its hexadecimal encoding with **pnpm exec wrangler secret put PIN_PEPPER**. Keep it stable across deployments. Losing or changing this secret makes existing PINs unusable; use existing device sessions or connection codes to set replacements. Never store this secret with a database export or in source control.
 
@@ -120,4 +135,11 @@ History is not automatically deleted. No off-provider backup schedule is configu
 
 ## Verification
 
-Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Browser checks cover member/staff workflows and phone/tablet/desktop layouts. Synthetic identities stay local.
+Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Synthetic identities stay local. The class extension passes 47 unit/security tests and the original runtime suite. Its local Cloudflare capacity test registers 200 members behind one IP, holds 200 authenticated live connections, performs 200 simultaneous roster reads and complete checkout/check-in cycles, checks isolation, and confirms both classes survive restart plus PIN reconnection. The initial run completed 1,415 requests with p95 1.96 seconds on the local Windows runtime; this is a local test, not a production performance guarantee. New browser visual checks could not run because the browser-control tool failed to initialize; class navigation uses the existing responsive styles and 44-pixel targets.
+
+
+## Capacity and live updates
+
+27-02 is tested for 200 members. Its storage guard allows 1,000 account rows per class, including staff. The live channel sends only a `refresh` signal after a committed change, then each client fetches an authorized roster. Notifications are coalesced, connections use Cloudflare hibernation, and at most five live connections per member are retained (1,000 per object). Gate/device validity and enabled status are rechecked before notifications. Logout and device resets close invalid connections. Hidden pages disconnect; reopening reconciles with the server. A role-specific roster cache lasts at most five seconds and is invalidated immediately on mutations.
+
+Cloudflare account quotas remain shared with the existing apps; no paid plan is enabled by this change. 200 continuously visible new-class clients reconciling every five minutes generate roughly 57,600 scheduled state reads per day, plus sign-ins, actions and refreshes after changes. Fallback polling uses more. Size the account plan for actual aggregate usage before sustained all-day use; connection capacity does not remove request/storage limits. See [Cloudflare pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/) and [limits](https://developers.cloudflare.com/durable-objects/platform/limits/).

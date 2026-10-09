@@ -28,7 +28,7 @@ export function cookieToken(request,name) {
   const value=request.headers.get('Cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(name+'='))?.slice(name.length+1);
   return /^[a-f0-9]{64}$/.test(value||'')?value:null;
 }
-export function sessionCookie(kind,token,maxAge) {return `__Host-tether-${kind}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;}
+export function sessionCookie(kind,token,maxAge,suffix='') {return `__Host-tether-${kind}${suffix}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;}
 export async function matchesPassword(value,expected) {
   if(typeof value!=='string'||value.length>128||!expected)return false;
   const a=await digest(value),b=await digest(expected);let difference=0;

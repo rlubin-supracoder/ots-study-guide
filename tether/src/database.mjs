@@ -76,14 +76,15 @@ export class Database {
       return {ok:true};
     });
   }
-  loginLimit(client) {
+  loginLimit(client, authenticatedSetup=false) {
     const window=Math.floor(Date.parse(this.clock())/900000);
-    for(const [key,max]of [[`login:${client}`,60],['login:global',1500]]) {
+    const lane=authenticatedSetup?'setup':'login';
+    for(const [key,max]of [[`${lane}:${client}`,authenticatedSetup?600:60],[`${lane}:global`,1500]]) {
       const row=this.one('SELECT * FROM limits WHERE key=?',key),count=row?.window===window?row.count+1:1;
       if(count>max)throw new AppError('Too many sign-in attempts. Wait 15 minutes and try again.',429);
       this.sql.exec('INSERT INTO limits VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET window=excluded.window,count=excluded.count',key,window,count);
     }
-    this.sql.exec('DELETE FROM limits WHERE key LIKE ? AND window < ?','login:%',window-1);
+    this.sql.exec("DELETE FROM limits WHERE (key LIKE 'login:%' OR key LIKE 'setup:%') AND window < ?",window-1);
   }
   session(hash,kind) {return hash?this.one('SELECT * FROM sessions WHERE token_hash=? AND kind=? AND expires_at>?',hash,kind,this.clock()):null;}
   gate(hash,passwordVersion) {
@@ -151,18 +152,27 @@ export class Database {
   audit(actor, subject, record, action, detail, at) {
     this.sql.exec('INSERT INTO audit(actor_id,subject_id,record_id,action,at,detail) VALUES (?,?,?,?,?,?)', actor, subject, record, action, at, JSON.stringify(detail));
   }
-  limit(user, write = false) {
+  limit(user, write = false, scaled = false) {
     const window = Math.floor(Date.parse(this.clock()) / 60000), key = `${user.id}:${write ? 'write' : 'read'}`;
+    if(scaled&&!write){
+      if(this.readWindow!==window){this.readWindow=window;this.readLimits=new Map();}
+      const count=(this.readLimits.get(key)||0)+1;this.readLimits.set(key,count);
+      if(count>180)throw new AppError('Too many requests. Please wait a minute and try again.',429);
+      return;
+    }
     const row = this.one('SELECT * FROM limits WHERE key=?', key);
     const count = row?.window === window ? row.count + 1 : 1;
     if (count > (write ? 30 : 180)) throw new AppError('Too many requests. Please wait a minute and try again.', 429);
     this.sql.exec('INSERT INTO limits VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET window=excluded.window,count=excluded.count', key, window, count);
   }
-  state(user) {
+  clearRosterCache(){this.rosterCache=null;}
+  state(user,scaled=false) {
     const now = this.clock();
     const active = this.one('SELECT * FROM checkouts WHERE user_id=? AND status=?', user.id, 'ACTIVE') || null;
     const fields = rosterFields + (user.role === 'admin' ? ',phone_number' : '');
-    const roster=this.rows(`SELECT ${fields} FROM checkouts WHERE status='ACTIVE' ORDER BY expected_return_at,checked_out_at`);
+    const cache=scaled&&this.rosterCache?.[user.role];
+    const roster=cache&&cache.expires>Date.parse(now)?cache.rows:this.rows(`SELECT ${fields} FROM checkouts WHERE status='ACTIVE' ORDER BY expected_return_at,checked_out_at`);
+    if(scaled){this.rosterCache??={};this.rosterCache[user.role]={rows:roster,expires:cache&&cache.rows===roster?cache.expires:Date.parse(now)+5000};}
     const pin=this.pinRecord(user.id);
     const result={user:{...user,email:user.account_type==='device'?null:user.email,has_pin:!!pin,pin_locked:!!pin&&pin.failed_attempts>=5},active,profile_complete:complete(user),roster,server_time:now};
     if(user.role==='admin') {
@@ -217,6 +227,7 @@ export class Database {
         return JSON.parse(previous.result);
       }
       const result = this.apply(user, body, now);
+      this.clearRosterCache();
       this.sql.exec('INSERT INTO requests VALUES (?,?,?,?,?)', user.id, requestId, fingerprint, JSON.stringify(result), now);
       this.sql.exec('DELETE FROM requests WHERE created_at < ?', new Date(Date.parse(now)-7*86400000).toISOString());
       return result;

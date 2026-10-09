@@ -11,7 +11,7 @@
 </head>
 <body>
   <a class="skip" href="#main">Skip to accountability</a>
-  <header class="masthead"><a href="/" class="brand" aria-label="Tether home"><img src="/icon.svg" width="42" height="42" alt=""><span>TETHER<small>OTS ACCOUNTABILITY</small></span></a><span class="base-label">MAXWELL AFB<br><strong>Stay connected.</strong></span></header>
+  <header class="masthead"><a href="/" class="brand" aria-label="Tether home"><img src="/icon.svg" width="42" height="42" alt=""><span>TETHER<small>OTS ACCOUNTABILITY</small></span></a><span class="base-label">MAXWELL AFB<br><strong>Stay connected.</strong></span></header><nav class="class-nav" aria-label="OTS class"><strong data-class-label>CLASS 27-01</strong><div><a data-class-link="27-01" href="/">27-01</a><a data-class-link="27-02" href="/class/27-02/">27-02</a></div></nav>
   <nav aria-label="Main navigation" class="nav"><button data-view="home" aria-current="page">Status</button><button data-view="profile">Profile</button><button data-view="history">My history</button><button data-view="admin" id="adminNav" hidden>Staff</button><a href="/staff" id="staffLink">Staff</a><a href="/" id="logout">Log out</a></nav>
   <main id="main" tabindex="-1">
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
@@ -21,7 +21,7 @@
       <article id="personal" class="personal panel" aria-busy="true"><p>Loading your verified status…</p></article>
       <div class="roster-heading"><h1>CURRENTLY OFF CAMPUS <span id="count" class="count">—</span></h1><p>Updates automatically · All times Central</p></div>
       <div id="roster" class="roster" aria-label="Current off-campus roster"></div>
-      <p class="privacy-note">Destinations are shared with members who have the campus password. No GPS tracking.</p>
+      <p class="privacy-note">Destinations are shared with members of your class. No GPS tracking.</p>
     </section>
     <section id="profile" class="view" hidden><div class="page-heading"><p class="eyebrow">YOUR DETAILS</p><h1>Ready when you are.</h1><p>Set up once. Update whenever your details change.</p></div>
       <form id="profileForm" class="panel form-stack"><label>Full name<input name="full_name" autocomplete="name" maxlength="100" minlength="2" required></label><div class="form-grid"><label>Flight number<input name="flight_number" autocomplete="off" maxlength="20" required></label><label>Room number<input name="room_number" autocomplete="off" maxlength="20" required></label></div><label>U.S. phone number<input name="phone_number" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="22" required placeholder="(334) 555-0123"></label><p class="hint">Your phone number is available to staff for accountability. Name, flight, room and destination appear on the member roster while you are out.</p><button type="submit" class="button primary">Save profile</button></form>

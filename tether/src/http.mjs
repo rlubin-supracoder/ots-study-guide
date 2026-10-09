@@ -1,5 +1,6 @@
-import { identity,csrf,bodyOf,cookieToken,digest,isStaffEmail } from './auth.mjs';
+import { identity,csrf,bodyOf,cookieToken,digest,isStaffEmail,matchesPassword } from './auth.mjs';
 import { AppError } from './validation.mjs';
+import { CLASSES,routeClass } from './classes.mjs';
 export const securityHeaders={
   'Cache-Control':'no-store, max-age=0',
   'X-Content-Type-Options':'nosniff',
@@ -19,7 +20,7 @@ export async function serveRequest(request,env,authenticate=identity) {
     if (url.origin!==env.APP_ORIGIN) throw new AppError('Unknown application address.',404);
     if (!['GET','HEAD','POST'].includes(request.method)) throw new AppError('Method not allowed.',405);
     const staff=url.pathname==='/staff'||url.pathname.startsWith('/staff/');
-    const publicAssets=new Set(['/app.js','/app.css','/entry.js','/time.mjs','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png','/apple-touch-icon.png']);
+    const publicAssets=new Set(['/app.js','/app.css','/entry.js','/class-context.js','/time.mjs','/manifest.webmanifest','/manifest-27-02.webmanifest','/icon.svg','/icon-192.png','/icon-512.png','/apple-touch-icon.png']);
     async function asset(path) {
       const assetUrl=new URL(path,env.APP_ORIGIN);
       const response=await env.ASSETS.fetch(new Request(assetUrl,{method:request.method}));
@@ -31,15 +32,20 @@ export async function serveRequest(request,env,authenticate=identity) {
       actor=await authenticate(request,env);
       if(!isStaffEmail(actor.email,env))throw new AppError('This staff page is restricted to approved administrators.',403);
     }
-    const stub=env.ACCOUNTABILITY.get(env.ACCOUNTABILITY.idFromName('tether-accountability-v1'));
-    const path=staff?url.pathname.slice('/staff'.length)||'/':url.pathname;
+    let {classroom,path}=routeClass(staff?url.pathname.slice('/staff'.length)||'/':url.pathname);
     const isApi=path.startsWith('/api/');
     const body=request.method==='POST'?(csrf(request,env),await bodyOf(request)):null;
-    const headers={'Content-Type':'application/json','X-Tether-Mode':staff?'staff':'member'};
+    // The common sign-in page accepts either class password; explicit class URLs stay class-specific.
+    if(!staff&&url.pathname==='/api/unlock'&&request.method==='POST'&&await matchesPassword(body.password,env.MEMBER_PASSWORD_27_02))classroom=CLASSES['27-02'];
+    const live=path==='/api/live';
+    if(live&&(staff||classroom.id!=='27-02'||request.method!=='GET'||request.headers.get('Upgrade')?.toLowerCase()!=='websocket'||request.headers.get('Origin')!==env.APP_ORIGIN))throw new AppError('Live connection is unavailable.',403);
+    const stub=env.ACCOUNTABILITY.get(env.ACCOUNTABILITY.idFromName(classroom.object));
+    const headers={'Content-Type':'application/json','X-Tether-Mode':staff?'staff':'member','X-Tether-Class':classroom.id};
+    if(live)headers.Upgrade='websocket';
     if(actor)headers['X-Verified-Email']=actor.email;
-    for(const kind of ['gate','device']){const value=cookieToken(request,`__Host-tether-${kind}`);if(value)headers[`X-Member-${kind}`]=await digest(value);}
+    for(const kind of ['gate','device']){const value=cookieToken(request,`__Host-tether-${kind}${classroom.cookieSuffix}`);if(value)headers[`X-Member-${kind}`]=await digest(value);}
     headers['X-Client-Hash']=await digest(request.headers.get('CF-Connecting-IP')||'unknown');
-    const response=await stub.fetch(new Request('https://internal'+(isApi?path:staff?'/access':'/entry'),{method:'POST',headers,body:JSON.stringify({method:request.method,body})}));
+    const response=await stub.fetch(new Request('https://internal'+(isApi?path:staff?'/access':'/entry'),{method:live?'GET':'POST',headers,body:live?undefined:JSON.stringify({method:request.method,body})}));
     if(!response.ok||isApi)return response;
     if (request.method!=='GET' && request.method!=='HEAD') throw new AppError('Method not allowed.',405);
     if(!['/','/index.html'].includes(path))throw new AppError('Page not found.',404);

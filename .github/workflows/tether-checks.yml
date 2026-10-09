@@ -26,3 +26,4 @@ jobs:
         env:
           WRANGLER_SEND_METRICS: 'false'
       - run: pnpm test:runtime
+      - run: pnpm test:capacity

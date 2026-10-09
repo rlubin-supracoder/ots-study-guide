@@ -2,11 +2,13 @@ import {createRequire} from 'node:module';
 import {readdir} from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {createServer} from 'node:net';
 const require=createRequire(import.meta.url),wranglerRequire=createRequire(require.resolve('wrangler/package.json'));
 const {Miniflare,convertV4MiniflareOptions}=wranglerRequire('miniflare');
 const root=path.resolve('dist'),sql=(await readdir(root)).filter(f=>f.endsWith('.sql'));
-const persist=path.resolve('.wrangler','runtime-test-'+crypto.randomUUID());
-const options={name:'tether-runtime-test',compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',PIN_PEPPER:'a'.repeat(64),APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
+const runId=crypto.randomUUID().slice(0,8),persist=path.resolve('.wrangler','runtime-'+runId);
+const port=await new Promise(resolve=>{const server=createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});});
+const options={name:'tether-runtime-'+runId,port,unsafeDevRegistryPath:path.join(persist,'registry'),compatibilityDate:'2026-09-25',modules:[{type:'ESModule',path:path.join(root,'worker.js')},...sql.map(file=>({type:'Text',path:path.join(root,file)}))],modulesRoot:root,durableObjects:{ACCOUNTABILITY:{className:'Accountability',useSQLite:true}},bindings:{BOOTSTRAP_ADMIN_EMAIL:'staff@example.test',STAFF_EMAILS:'second@example.test',MEMBER_PASSWORD:'runtime-password',PIN_PEPPER:'a'.repeat(64),APP_ORIGIN:'https://tether.test',ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',ACCESS_AUD:'test'},resourcePersistencePath:persist,telemetry:{enabled:false}};
 const runtimeOptions={...convertV4MiniflareOptions(options),resourcePersistencePath:persist,telemetry:{enabled:false}};
 let mf=new Miniflare(runtimeOptions);
 async function client(){const ns=await mf.getDurableObjectNamespace('ACCOUNTABILITY');return ns.get(ns.idFromName('tether-accountability-v1'));}

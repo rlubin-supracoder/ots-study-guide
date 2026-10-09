@@ -1,8 +1,8 @@
-import { centralInput,centralToUTC,dateTime } from './time.mjs';
+import { centralInput,centralToUTC,dateTime } from '/time.mjs';
+import {staffPage,classId,home,apiPrefix} from '/class-context.js';
 const $=selector=>document.querySelector(selector);
-const staffPage=location.pathname==='/staff'||location.pathname.startsWith('/staff/');
 $('#staffLink').hidden=staffPage;
-$('#signInLink').href=staffPage?'/staff':'/';
+$('#signInLink').href=staffPage?apiPrefix:home;
 $('#forgetDevice').hidden=staffPage;
 const el=(tag,className,content)=>{const node=document.createElement(tag);if(className)node.className=className;if(content!==undefined)node.textContent=content;return node;};
 let state=null,view='home',staffView='records',busy=false,fresh=false,profileVersion,historyOffset=0,adminOffset=0,auditOffset=0,memberFilter=null,rosterSignature='',adminSignature='',personalOverdue=false,users=[],lastSync=0,serverOffset=0,refreshPromise;
@@ -10,9 +10,9 @@ const retries=new Map();
 const now=()=>Date.now()+serverOffset;
 function notice(message,error=false){const node=$('#notice');node.textContent=message;node.hidden=!message;node.classList.toggle('error-state',error);}
 function dialogError(message){$('#dialogError').textContent=message;$('#dialogError').hidden=!message;}
-function lock(){fresh=false;document.body.classList.add('locked');$('#authError').hidden=false;$('#dialog').close();state=null;for(const id of ['personal','roster','myHistory','adminHistory','usersList','auditList','stats'])$('#'+id).replaceChildren();$('#profileForm').reset();}
+function lock(){fresh=false;liveSocket?.close();document.body.classList.add('locked');$('#authError').hidden=false;$('#dialog').close();state=null;for(const id of ['personal','roster','myHistory','adminHistory','usersList','auditList','stats'])$('#'+id).replaceChildren();$('#profileForm').reset();}
 async function api(path,data){
-  if(staffPage)path='/staff'+path;
+  path=apiPrefix+path;
   let response;
   try{response=await fetch(path,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',redirect:'manual',headers:data===undefined?{}:{'Content-Type':'application/json','X-Tether-Request':'1'},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(15000)});}
   catch{throw new Error('Connection interrupted or session expired. Your change could not be confirmed. Refresh your status or sign in again before retrying.');}
@@ -71,7 +71,7 @@ function renderRoster(){
 async function refresh(force=false){
   if(refreshPromise)return refreshPromise;
   refreshPromise=(async()=>{try{
-    const next=await api('/api/state');serverOffset=Date.parse(next.server_time)-Date.now();lastSync=Date.now();fresh=true;document.body.classList.remove('locked');$('#authError').hidden=true;
+    const next=await api('/api/state');if(next.class_id!==classId){lock();throw new Error('Class could not be verified. Sign in again.');}serverOffset=Date.parse(next.server_time)-Date.now();lastSync=Date.now();fresh=true;document.body.classList.remove('locked');$('#authError').hidden=true;
     const changed=JSON.stringify([next.user,next.active])!==JSON.stringify([state?.user,state?.active]);state=next;$('#adminNav').hidden=state.user.role!=='admin';
     $('#profilePinButton').textContent=state.user.has_pin?'Change profile PIN':'Create profile PIN';
     $('#pinStatus').textContent=state.user.pin_locked?'PIN recovery is locked after unsuccessful attempts. Set a new PIN here to unlock it.':state.user.has_pin?'Your PIN is set. Use it with your full name and phone number to reconnect on another device.':'Create your four-digit PIN before your next checkout. Your profile and checkout history will stay the same.';
@@ -198,14 +198,33 @@ $('#moreHistory').addEventListener('click',guarded(async()=>{historyOffset+=50;a
 $('#moreAdminHistory').addEventListener('click',guarded(async()=>{adminOffset+=50;await loadHistory(true,true);}));
 $('#moreAudit').addEventListener('click',guarded(async()=>{auditOffset+=50;await loadAudit(true);}));
 if(staffPage)$('#logout').href='/cdn-cgi/access/logout';
-$('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign('/');}lock();retries.clear();}));
+$('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign(home);}lock();retries.clear();}));
 $('#connectDevice').addEventListener('click',guarded(()=>connectionCode()));
 $('#profilePinButton').addEventListener('click',()=>profilePin());
-$('#forgetDevice').addEventListener('click',()=>{const box=modal('Forget this device?');box.append(el('p','','Your profile, status and history will be kept. Reconnect with your profile PIN or a connection code from another device or staff.'));box.append(button('Forget and log out',guarded(async()=>{await api('/api/logout',{forget_device:true});location.assign('/');}),'button primary'));});
+$('#forgetDevice').addEventListener('click',()=>{const box=modal('Forget this device?');box.append(el('p','','Your profile, status and history will be kept. Reconnect with your profile PIN or a connection code from another device or staff.'));box.append(button('Forget and log out',guarded(async()=>{await api('/api/logout',{forget_device:true});location.assign(home);}),'button primary'));});
 window.addEventListener('offline',()=>{fresh=false;$('#sync').textContent='Offline · status unverified';renderPersonal();notice('You are offline. Reconnect to verify your status before checking in or out.',true);});
 window.addEventListener('online',()=>refresh(true));
 window.addEventListener('pageshow',event=>{if(event.persisted){lock();refresh(true);}});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true);});
-setInterval(async()=>{if(document.hidden||busy||document.body.classList.contains('locked'))return;const ok=await refresh();if(ok){renderStats();if(view==='admin'&&!$('#dialog').open&&!$('#staffRecords').contains(document.activeElement)){try{if(staffView==='records'&&adminOffset===0)await loadHistory(true);}catch{}}}if(Date.now()-lastSync>30000){fresh=false;renderPersonal();}},15000);
+let liveSocket=null,liveRetryAt=0,liveRefreshTimer=null;
+const liveEnabled=classId==='27-02'&&!staffPage;
+function openLive(){
+  if(!liveEnabled||document.hidden||!state||document.body.classList.contains('locked')||liveSocket||Date.now()<liveRetryAt)return;
+  const url=new URL(apiPrefix+'/api/live',location.origin);url.protocol=url.protocol==='https:'?'wss:':'ws:';
+  const socket=new WebSocket(url);liveSocket=socket;
+  socket.addEventListener('open',()=>refresh());
+  socket.addEventListener('message',event=>{if(event.data!=='refresh'||liveRefreshTimer)return;liveRefreshTimer=setTimeout(async()=>{liveRefreshTimer=null;if(refreshPromise)await refreshPromise;if(!document.hidden)await refresh();},300+Math.random()*400);});
+  socket.addEventListener('close',()=>{if(liveSocket===socket)liveSocket=null;liveRetryAt=Date.now()+15000+Math.random()*15000;});
+  socket.addEventListener('error',()=>socket.close());
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){liveSocket?.close();liveSocket=null;}else{refresh(true).then(openLive);}});
+setInterval(async()=>{
+  if(document.hidden||busy||document.body.classList.contains('locked')){if(document.body.classList.contains('locked'))liveSocket?.close();return;}
+  openLive();
+  const interval=liveEnabled&&liveSocket?.readyState===WebSocket.OPEN?300000:15000;
+  if(liveEnabled&&interval===300000&&Date.now()-lastSync<interval){if(state){renderRoster();if(personalOverdue!==(!!state.active&&Date.parse(state.active.expected_return_at)<now()))renderPersonal();}return;}
+  const ok=await refresh();if(ok){renderStats();if(view==='admin'&&!$('#dialog').open&&!$('#staffRecords').contains(document.activeElement)){try{if(staffView==='records'&&adminOffset===0)await loadHistory(true);}catch{}}}
+  if(Date.now()-lastSync>interval+15000){fresh=false;renderPersonal();}
+},15000);
 await refresh(true);
+openLive();
 if(staffPage&&state)await navigate('admin');

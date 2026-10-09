@@ -2,25 +2,29 @@ import { AppError,admin,profile,id,text,phone } from './validation.mjs';
 import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail } from './auth.mjs';
 import {confirmedPin,pinValue,hashPin,pinFingerprint,sameHash} from './pin.mjs';
 import { json,failure } from './http.mjs';
-export async function databaseRequest(db,request,env={}) {
+import { classFor } from './classes.mjs';
+export async function databaseRequest(db,request,env={},liveConnect) {
   try {
     const path=new URL(request.url).pathname;
-    const {method,body}=await request.json();
+    const {method,body}=request.headers.get('Upgrade')?.toLowerCase()==='websocket'?{method:'GET',body:null}:await request.json();
+    const classroom=classFor(request.headers.get('X-Tether-Class')||'27-01');
+    const password=env[classroom.passwordKey],scaled=classroom.id==='27-02';
     const staff=request.headers.get('X-Tether-Mode')==='staff';
     const gateHash=request.headers.get('X-Member-gate'),deviceHash=request.headers.get('X-Member-device');
-    const passwordVersion=env.MEMBER_PASSWORD?await digest(env.MEMBER_PASSWORD):null;
-    const responseWithCookie=(value,kind,token,maxAge)=>{const response=json(value);response.headers.append('Set-Cookie',sessionCookie(kind,token,maxAge));return response;};
+    const passwordVersion=password?await digest(password):null;
+    const responseWithCookie=(value,kind,token,maxAge)=>{const response=json(value);response.headers.append('Set-Cookie',sessionCookie(kind,token,maxAge,classroom.cookieSuffix));return response;};
     if(!staff&&path==='/api/unlock'&&method==='POST') {
-      db.loginLimit(request.headers.get('X-Client-Hash')||'unknown');
-      if(!env.MEMBER_PASSWORD)throw new AppError('Member sign-in is temporarily unavailable.',503);
-      if(!await matchesPassword(body.password,env.MEMBER_PASSWORD))throw new AppError('Incorrect campus password.',401);
+      const valid=await matchesPassword(body.password,password);
+      db.loginLimit(request.headers.get('X-Client-Hash')||'unknown',scaled&&valid);
+      if(!password)throw new AppError('Member sign-in is temporarily unavailable.',503);
+      if(!valid)throw new AppError('Incorrect campus password.',401);
       const token=randomToken();db.createSession('gate',await digest(token),null,passwordVersion);
-      return responseWithCookie({ok:true},'gate',token,86400);
+      return responseWithCookie({ok:true,class_id:classroom.id,redirect:classroom.prefix+'/'},'gate',token,86400);
     }
     if(!staff&&path==='/api/logout'&&method==='POST') {
       if(gateHash)db.sql.exec('DELETE FROM sessions WHERE token_hash=?',gateHash);
       const response=responseWithCookie({ok:true},'gate','',0);
-      if(body.forget_device===true){if(deviceHash)db.sql.exec('DELETE FROM sessions WHERE token_hash=?',deviceHash);response.headers.append('Set-Cookie',sessionCookie('device','',0));}
+      if(body.forget_device===true){if(deviceHash)db.sql.exec('DELETE FROM sessions WHERE token_hash=?',deviceHash);response.headers.append('Set-Cookie',sessionCookie('device','',0,classroom.cookieSuffix));}
       return response;
     }
     if(!staff&&path==='/entry') {
@@ -30,7 +34,7 @@ export async function databaseRequest(db,request,env={}) {
       db.authorize({userId:device.user_id});return json({mode:'member'});
     }
     if(!staff&&['/api/join','/api/connect','/api/connect-pin'].includes(path)&&method==='POST') {
-      db.gate(gateHash,passwordVersion);db.loginLimit(request.headers.get('X-Client-Hash')||'unknown');
+      db.gate(gateHash,passwordVersion);db.loginLimit(request.headers.get('X-Client-Hash')||'unknown',scaled);
       if(db.session(deviceHash,'device'))throw new AppError('This device already has a profile. Refresh to continue.',409);
       const token=randomToken(),hash=await digest(token);
       if(path==='/api/join') {
@@ -57,9 +61,10 @@ export async function databaseRequest(db,request,env={}) {
       if(!actor||!isStaffEmail(actor,env))throw new AppError('Staff access denied.',403);
     }else actor=db.memberPrincipal(gateHash,deviceHash,passwordVersion);
     const user=db.authorize(actor);if(staff)admin(user);
-    db.limit(user,['/api/action','/api/device-code','/api/profile-pin'].includes(path));
+    db.limit(user,['/api/action','/api/device-code','/api/profile-pin'].includes(path),scaled);
+    if(path==='/api/live'&&method==='GET'&&!staff&&scaled&&liveConnect)return liveConnect({userId:user.id,gateHash,deviceHash,passwordVersion});
     if (path==='/access') return json({ok:true});
-    if (path==='/api/state' && method==='GET') return json(db.state(user));
+    if (path==='/api/state' && method==='GET') return json({...db.state(user,scaled),class_id:classroom.id});
     if (method!=='POST') throw new AppError('Method not allowed.',405);
     if(path==='/api/profile-pin') {
       const value=confirmedPin(body),existing=db.pinRecord(user.id);
