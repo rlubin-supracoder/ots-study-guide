@@ -2,7 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {Database} from '../src/database.mjs';
 export const migration=readFileSync(new URL('../migrations/001_initial.sql',import.meta.url),'utf8');
-export const migrations=[{version:1,sql:migration},{version:2,sql:readFileSync(new URL('../migrations/002_member_sessions.sql',import.meta.url),'utf8')},{version:3,sql:readFileSync(new URL('../migrations/003_profile_pins.sql',import.meta.url),'utf8')}];
+export const migrations=[{version:1,sql:migration},{version:2,sql:readFileSync(new URL('../migrations/002_member_sessions.sql',import.meta.url),'utf8')},{version:3,sql:readFileSync(new URL('../migrations/003_profile_pins.sql',import.meta.url),'utf8')},{version:4,sql:readFileSync(new URL('../migrations/004_daily_reports.sql',import.meta.url),'utf8')}];
 export function storage(filename=':memory:') {
   const sqlite=new DatabaseSync(filename);sqlite.exec('PRAGMA foreign_keys=ON');
   return {sqlite,sql:{exec(query,...params){if(!params.length&&query.includes(';')){sqlite.exec(query);return [];}return sqlite.prepare(query).all(...params);}},transactionSync(fn){sqlite.exec('BEGIN IMMEDIATE');try{const result=fn();sqlite.exec('COMMIT');return result;}catch(error){sqlite.exec('ROLLBACK');throw error;}}};

@@ -7,10 +7,16 @@
     "test": "node --test test/*.test.mjs",
     "test:runtime": "node scripts/runtime-test.mjs",
     "test:capacity": "node scripts/class-capacity-test.mjs",
+    "test:reports": "node scripts/reports-runtime-test.mjs",
     "build": "wrangler deploy --dry-run --outdir dist",
     "deploy": "wrangler deploy",
     "preview": "node scripts/preview.mjs"
   },
-  "dependencies": { "jose": "6.2.12" },
-  "devDependencies": { "wrangler": "4.135.0" }
+  "dependencies": {
+    "fflate": "0.8.2",
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "wrangler": "4.135.0"
+  }
 }

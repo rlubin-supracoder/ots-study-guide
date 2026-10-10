@@ -44,6 +44,20 @@ Open **/staff** and use an approved staff email for email-code sign-in. Staff do
 
 Campus counts include enabled members with completed profiles. Names, flights, rooms and phone numbers are snapshotted at checkout; profile edits do not rewrite historical identities.
 
+## Daily Class 27-01 spreadsheet
+
+Open **Staff → Audit Trail**. The top panel downloads the latest `.xlsx`; **Previous daily reports** opens the archive. Reports are saved at **21:00 America/Chicago**, following daylight saving. The first file appears at the next scheduled capture after deployment; earlier days are not reconstructed.
+
+Each workbook includes all 27-01 accounts, including disabled accounts and incomplete staff/member profiles. Columns contain last name, full name, flight, room, phone, campus status, overdue flag, latest trip's departure/expected return/arrival/destination, account state, profile completeness, role and account ID. Profile fields reflect capture time; trip fields describe the latest trip. An active trip takes priority. Incomplete profiles without an active trip are marked **PROFILE INCOMPLETE**. Names are sorted by the surname inferred from the stored full name (comma notation and common suffixes/particles supported), then full name. The source full name remains unchanged; accounts without names sort last. Compound names may require staff review because profiles have a single full-name field.
+
+The private `daily_reports` table stores immutable Excel bytes, local report date, scheduled UTC time, actual UTC capture time and account count. Migration `004_daily_reports.sql` only adds this table. Capturing a report does not alter users, trips, PINs or sessions. A transaction commits the snapshot and audit entry together; the date primary key prevents duplicate files. Later corrections do not rewrite saved reports. Keep downloaded files restricted as they include contact and accountability information. Reports are retained with the existing database and its backup/recovery policy; do not commit exports to Git.
+
+Cloudflare's `*/5 2,3 * * *` UTC trigger checks both possible Central evening hours. The scheduled handler calls only the original 27-01 Durable Object and captures once during local hour 21. Subsequent five-minute ticks retry a failed capture until 21:55 and otherwise do nothing. A delayed file shows its actual capture time rather than claiming an exact 21:00 snapshot. A whole missed window is not backfilled from today's state. Check **Workers → tether → Triggers / Cron events** for failures or missed files. New triggers can take several minutes to propagate.
+
+Listing (`/staff/api/admin/reports`) and downloading (`/staff/api/admin/reports/YYYY-MM-DD.xlsx`) require verified, enabled 27-01 staff authorization in both server layers. Member sessions and 27-02-only staff cannot access these files. Responses are `no-store` and `noindex`; no reports are public assets. Creation and successful authorized download requests are audited without workbook contents. The panel checks for newly saved reports every minute while open.
+
+Deployment uses the existing `pnpm deploy`; no new secrets, DNS or Access policies are required. Keep the Durable Object identity unchanged. `pnpm test` covers scheduling/DST, privacy, migration preservation, sorting, literal-string safety and idempotency. After `pnpm build`, `pnpm test:reports` exercises scheduled events, RPC, SQLite workbook storage, class isolation and persistence in the actual local Cloudflare runtime. The production writer fills the generic artifact-authored Excel layout in `src/report-template.mjs` using `fflate`; the desktop artifact tool is not a production dependency.
+
 ## Architecture and security
 
 A separate Cloudflare Worker and SQLite Durable Object follow the root website and Operation Valor deployment model. Native JavaScript/CSS use the existing navy/blue visual identity. Their routes and databases remain independent.
@@ -68,6 +82,7 @@ Keep binding **ACCOUNTABILITY** and class **Accountability** stable. Permanent o
 | checkouts | Profile snapshot, destination, departure/expected/actual return, status and revision |
 | sessions | Hashed gate/device/connection tokens, expiry and password version |
 | profile_pins | Salted, peppered PIN credentials, revision and persistent failed-attempt count |
+| daily_reports | Private, immutable 27-01 daily Excel snapshots and capture metadata |
 | audit | Actor, subject, trip, timestamp, event and correction details |
 | requests | Per-user idempotency receipts retained seven days |
 | limits | Persistent request-rate counters |
@@ -122,7 +137,7 @@ GitHub CI runs tests/build/runtime checks without deployment credentials. Deploy
 
 Only **tether.russelllubinski.us** belongs to this Worker. Cloudflare manages DNS routing, TLS and renewal. The zone and Worker enforce HTTP-to-HTTPS. Do not add wildcard routes or modify root-site/Valor DNS.
 
-001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type. 003_profile_pins.sql only creates the PIN table: it does not update or delete users, trips, audit history or sessions. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
+001_initial.sql creates the original schema; 002_member_sessions.sql adds sessions and account type. 003_profile_pins.sql creates the PIN table; 004_daily_reports.sql adds saved Excel reports. These additions do not update or delete users, trips, audit history or sessions. The constructor applies numbered migrations transactionally. Add new numbered files, import them in src/worker.mjs and append their versions. Never edit an applied migration or change the object's identity. Test fresh and upgraded databases.
 
 To add staff, preserve existing additional addresses and update the STAFF_EMAILS Worker secret with **pnpm exec wrangler secret put STAFF_EMAILS**. Deploy or activate the updated configuration; the Durable Object creates/promotes each newly configured staff account once, preserving existing records and adding an audit event. Set TETHER_STAFF_EMAILS to the complete list, including BOOTSTRAP_ADMIN_EMAIL, and apply the Access configuration script. Verify the account in **Staff → Members**. No mailbox address belongs in public source. A database promotion alone does not grant staff access, and members cannot promote themselves.
 
@@ -137,6 +152,8 @@ Cloudflare provides a rolling [30-day SQLite Durable Object recovery window](htt
 History is not automatically deleted. No off-provider backup schedule is configured. Establish encrypted restricted backups if retention beyond Cloudflare's recovery window is required; never put personnel exports in this repository.
 
 ## Verification
+
+The daily-report release passes 61 unit/security tests, the original runtime suite, scheduled-report runtime tests and the 200-user capacity test. Browser checks verified the empty report panel, downloaded XLSX, archive and class separation at phone/tablet sizes, including 320px without horizontal overflow. A downloaded synthetic workbook was independently opened to verify its contents. Excel layout previews and independent workbook reads checked dates, literal text identifiers, filtering and frozen panes. Run `pnpm preview -- --reports` (or `node scripts/preview.mjs --reports`) for local synthetic report examples; this harness never deploys and is not a production route.
 
 Automated tests cover non-destructive upgrades, PIN setup/recovery/lockout, passwords/sessions, connection codes, lost responses, expired/revoked sessions, staff JWTs, CSRF, unauthorized requests, ownership, validation, simultaneous checkout, idempotency, corrections, history, rate limits and Central Time/DST. Runtime tests use actual Cloudflare SQLite and verify PIN hashing, recovery and state/session persistence across restart. Synthetic identities stay local. The class extension passes 53 unit/security tests, including signed-JWT class-specific staff authorization, denied cross-class requests, preserved global access and disabled-account handling and the original runtime suite. Its local Cloudflare capacity test registers 200 members behind one IP, holds 200 authenticated live connections, performs 200 simultaneous roster reads and complete checkout/check-in cycles, checks isolation, and confirms both classes survive restart plus PIN reconnection. The initial run completed 1,415 requests with p95 1.96 seconds on the local Windows runtime; this is a local test, not a production performance guarantee. New browser visual checks could not run because the browser-control tool failed to initialize; class navigation uses the existing responsive styles and 44-pixel targets.
 

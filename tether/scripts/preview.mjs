@@ -5,11 +5,17 @@ import {fixture} from '../test/helpers.mjs';
 import {serveRequest} from '../src/http.mjs';
 import {databaseRequest} from '../src/service.mjs';
 import {CLASSES} from '../src/classes.mjs';
+import {captureReport} from '../src/reports.mjs';
 const f=fixture();f.setTime(new Date().toISOString());f.setup('staff@example.test','Preview Staff');
 for(const [email,name] of [['member@example.test','Preview Member'],['overdue@example.test','Preview Overdue']]){f.invite(email);f.setup(email,name);}
 f.setTime(new Date(Date.now()-3*3600000).toISOString());f.send('overdue@example.test','checkout',{destination:'Preview destination',expected_return_at:new Date(Date.now()-3600000).toISOString(),version:f.db.authorize('overdue@example.test').version});
 f.db.sql.exec('DELETE FROM profile_pins');
 f.db.clock=()=>new Date().toISOString();
+if(process.argv.includes('--reports')){
+  // Synthetic report dates for local download/empty/archive UI checks only.
+  for(const time of ['2026-10-11T02:00:00.000Z','2026-10-12T02:00:00.000Z']){f.db.clock=()=>time;captureReport(f.db,Date.parse(time));}
+  f.db.clock=()=>new Date().toISOString();
+}
 const origin='http://127.0.0.1:8791';
 const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.mjs':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 const newClass=fixture();newClass.db.clock=()=>new Date().toISOString();

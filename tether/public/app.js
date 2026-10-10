@@ -7,10 +7,11 @@ $('#forgetDevice').hidden=staffPage;
 const el=(tag,className,content)=>{const node=document.createElement(tag);if(className)node.className=className;if(content!==undefined)node.textContent=content;return node;};
 let state=null,view='home',staffView='records',busy=false,fresh=false,profileVersion,historyOffset=0,adminOffset=0,auditOffset=0,memberFilter=null,rosterSignature='',adminSignature='',personalOverdue=false,users=[],lastSync=0,serverOffset=0,refreshPromise;
 const retries=new Map();
+let reportsBefore,reportSignature='',reportRefreshAt=0;
 const now=()=>Date.now()+serverOffset;
 function notice(message,error=false){const node=$('#notice');node.textContent=message;node.hidden=!message;node.classList.toggle('error-state',error);}
 function dialogError(message){$('#dialogError').textContent=message;$('#dialogError').hidden=!message;}
-function lock(){fresh=false;liveSocket?.close();document.body.classList.add('locked');$('#authError').hidden=false;$('#dialog').close();state=null;for(const id of ['personal','roster','myHistory','adminHistory','usersList','auditList','stats'])$('#'+id).replaceChildren();$('#profileForm').reset();}
+function lock(){fresh=false;liveSocket?.close();document.body.classList.add('locked');$('#authError').hidden=false;$('#dialog').close();state=null;for(const id of ['personal','roster','myHistory','adminHistory','usersList','auditList','stats','reportLatest','reportDownloads','reportStatus'])$('#'+id).replaceChildren();$('#dailyReports').hidden=true;reportSignature='';$('#profileForm').reset();}
 async function api(path,data){
   path=apiPrefix+path;
   let response;
@@ -158,7 +159,38 @@ async function loadUsers(){
   const box=$('#usersList');box.replaceChildren();for(const user of users){const card=el('article','user-card');card.append(el('h3','',user.full_name||'Profile not yet completed'),el('p','meta',user.email||'Member profile'),el('p','meta',`${user.role==='admin'?'Administrator':'Member'} · ${user.enabled?'Enabled':'Disabled'}${user.flight_number?' · Flight '+user.flight_number:''}`));const actions=el('div','actions');actions.append(button('Manage access',()=>manageUser(user)),button('View history',()=>showMemberHistory(user.id,user.full_name||user.email),'text-button'));if(user.enabled)actions.append(button('Connection code',()=>staffConnection(user)));card.append(actions);box.append(card);}
 }
 function renderStats(){if(!state?.counts)return;const c=state.counts,counts=[['On campus',c.on_campus],['Off campus',c.off_campus],['Overdue',c.overdue]];$('#stats').replaceChildren();for(const [label,n]of counts){const item=el('div','stat');item.append(el('strong','',n),el('span','',label));$('#stats').append(item);}if(c.pending){const p=el('p','hint',`${c.pending} approved account${c.pending===1?'':'s'} awaiting profile setup; excluded from campus counts.`);$('#stats').append(p);}}
-async function staffTab(next){staffView=next;for(const b of document.querySelectorAll('[data-staff]'))b.setAttribute('aria-pressed',String(b.dataset.staff===next));$('#staffRecords').hidden=next!=='records';$('#staffUsers').hidden=next!=='users';$('#staffAudit').hidden=next!=='audit';if(next==='records'){adminOffset=0;await loadHistory(true);}if(next==='users')await loadUsers();if(next==='audit'){auditOffset=0;await loadAudit();}}
+async function staffTab(next){staffView=next;for(const b of document.querySelectorAll('[data-staff]'))b.setAttribute('aria-pressed',String(b.dataset.staff===next));$('#staffRecords').hidden=next!=='records';$('#staffUsers').hidden=next!=='users';$('#staffAudit').hidden=next!=='audit';if(next==='records'){adminOffset=0;await loadHistory(true);}if(next==='users')await loadUsers();if(next==='audit'){auditOffset=0;await Promise.all([loadReports().catch(error=>notice(error.message,true)),loadAudit()]);}}
+async function loadReports(append=false){
+  if(!staffPage||classId!=='27-01')return;
+  $('#dailyReports').hidden=false;
+  const data=await api('/api/admin/reports',append?{before:reportsBefore}:{});
+  if(!state)return;
+  reportRefreshAt=now()+60000;
+  const signature=JSON.stringify(data.reports);
+  if(!append&&reportSignature===signature)return;
+  if(!append){$('#reportDownloads').replaceChildren();$('#reportLatest').replaceChildren();reportSignature=signature;}
+  const box=$('#reportDownloads');
+  for(const [index,report]of data.reports.entries()){
+    const card=el('div','report-download');
+    const button=el('button',!append&&index===0?'button primary':'button',`${!append&&index===0?'Download latest':'Download'} · ${report.report_date} (.xlsx)`);
+    button.type='button';button.addEventListener('click',guarded(()=>downloadReport(report.report_date,button)));
+    card.append(button,el('p','hint',`${report.user_count} accounts · Captured ${dateTime(report.captured_at)}${Date.parse(report.captured_at)-Date.parse(report.scheduled_for)>=60000?' · Delayed capture':''}`));(!append&&index===0?$('#reportLatest'):box).append(card);
+  }
+  reportsBefore=data.reports.at(-1)?.report_date;
+  $('#moreReports').hidden=!data.more;
+  $('#reportArchive').hidden=!box.childElementCount;
+  $('#reportStatus').textContent=$('#reportLatest').childElementCount?'Reports preserve the state at the capture time shown.':`The first report will appear after ${dateTime(data.next_at)}. No earlier snapshots are available.`;
+}
+async function downloadReport(date,button){
+  button.disabled=true;
+  try{
+    const response=await fetch(apiPrefix+`/api/admin/reports/${date}.xlsx`,{credentials:'same-origin',cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(30000)});
+    if(response.type==='opaqueredirect'||response.status===401||response.status===403){lock();throw new Error('Your staff session ended. Sign in again to download the report.');}
+    if(!response.ok)throw new Error('The report could not be downloaded. Please try again.');
+    if(!response.headers.get('Content-Type')?.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')){lock();throw new Error('Sign in again to download the report.');}
+    const url=URL.createObjectURL(await response.blob()),link=el('a');link.href=url;link.download=`Tether-27-01-${date}.xlsx`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }finally{button.disabled=false;}
+}
 async function loadAudit(append=false){const data=await api('/api/admin/audit',{offset:auditOffset});const box=$('#auditList');if(!append)box.replaceChildren();for(const row of data.records){const card=el('article','audit-card');card.append(el('h3','',row.action.replaceAll('_',' ')),el('p','meta',`${dateTime(row.at)} · ${row.actor_email||'System setup'}`));if(row.subject_name)card.append(el('p','',row.subject_name));const detail=el('details');detail.append(el('summary','','View change details'),el('pre','',JSON.stringify(JSON.parse(row.detail),null,2)));card.append(detail);box.append(card);}$('#moreAudit').hidden=!data.more;}
 function manualCheckin(record){const box=modal('Staff check-in'),form=el('form','form-stack');form.append(el('p','',`Confirm ${record.full_name} has returned to campus.`));field(form,'Reason / accountability note','reason','text','',true,240).minLength=3;submit(form,'Check member in');box.append(form);form.addEventListener('submit',async event=>{event.preventDefault();if(await mutate('admin_checkin',{record_id:record.id,reason:form.elements.reason.value}))await refreshStaff();});}
 function correct(record){
@@ -198,6 +230,8 @@ $('#resetFilters').addEventListener('click',guarded(async()=>{$('#filterForm').r
 $('#moreHistory').addEventListener('click',guarded(async()=>{historyOffset+=50;await loadHistory(false,true);}));
 $('#moreAdminHistory').addEventListener('click',guarded(async()=>{adminOffset+=50;await loadHistory(true,true);}));
 $('#moreAudit').addEventListener('click',guarded(async()=>{auditOffset+=50;await loadAudit(true);}));
+$('#moreReports').addEventListener('click',guarded(()=>loadReports(true)));
+setInterval(()=>{if(!document.hidden&&fresh&&view==='admin'&&staffView==='audit'&&now()>=reportRefreshAt)loadReports().catch(error=>notice(error.message,true));},15000);
 if(staffPage)$('#logout').href='/cdn-cgi/access/logout';
 $('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign(home);}lock();retries.clear();}));
 $('#connectDevice').addEventListener('click',guarded(()=>connectionCode()));

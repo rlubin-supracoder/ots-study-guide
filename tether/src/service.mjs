@@ -1,7 +1,8 @@
 import { AppError,admin,profile,id,text,phone } from './validation.mjs';
 import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail,staffClasses } from './auth.mjs';
 import {confirmedPin,pinValue,hashPin,pinFingerprint,sameHash} from './pin.mjs';
-import { json,failure } from './http.mjs';
+import { json,failure,securityHeaders } from './http.mjs';
+import {listReports,readReport,XLSX_TYPE} from './reports.mjs';
 import { classFor } from './classes.mjs';
 export async function databaseRequest(db,request,env={},liveConnect) {
   try {
@@ -67,6 +68,14 @@ export async function databaseRequest(db,request,env={},liveConnect) {
     if(path==='/api/live'&&method==='GET'&&!staff&&scaled&&liveConnect)return liveConnect({userId:user.id,gateHash,deviceHash,passwordVersion});
     if (path==='/access') return json({ok:true});
     if (path==='/api/state' && method==='GET') return json({...db.state(user,scaled),class_id:classroom.id,...(staff?{staff_classes:staffClasses(actor,env)}:{})});
+    if(path==='/api/admin/reports'||path.startsWith('/api/admin/reports/')) {
+      if(!staff||classroom.id!=='27-01')throw new AppError('Reports require Class 27-01 staff access.',403);
+      admin(user);
+      if(path==='/api/admin/reports'&&['GET','POST'].includes(method))return json(listReports(db,user,body?.before));
+      const match=path.match(/^\/api\/admin\/reports\/(\d{4}-\d{2}-\d{2})\.xlsx$/);
+      if(match&&method==='GET')return new Response(readReport(db,user,match[1]),{headers:{...securityHeaders,'Content-Type':XLSX_TYPE,'Content-Disposition':`attachment; filename="Tether-27-01-${match[1]}.xlsx"`}});
+      throw new AppError('Report not found.',404);
+    }
     if (method!=='POST') throw new AppError('Method not allowed.',405);
     if(path==='/api/profile-pin') {
       const value=confirmedPin(body),existing=db.pinRecord(user.id);

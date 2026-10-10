@@ -17,7 +17,7 @@ test('session migration upgrades the existing database without replacing profile
   assert.equal(db.state(db.authorize('staff@example.test')).active.id,trip.record_id);
   assert.equal(db.authorize('staff@example.test').id,user.id);
   assert.equal(db.authorize('staff@example.test').account_type,'email');
-  assert.equal(db.one('SELECT COUNT(*) n FROM schema_migrations').n,3);
+  assert.equal(db.one('SELECT COUNT(*) n FROM schema_migrations').n,4);
   new Database(s,migrations,'other@example.test',clock);assert.equal(db.one('SELECT COUNT(*) n FROM users').n,1);
 });
 test('required profile and invalid phone, script, excessive fields are rejected',()=>{

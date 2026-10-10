@@ -33,7 +33,15 @@
       <div class="subnav" aria-label="Staff views"><button data-staff="records" aria-pressed="true">Records</button><button data-staff="users" aria-pressed="false">Members</button><button data-staff="audit" aria-pressed="false">Audit trail</button></div>
       <div id="staffRecords"><form id="filterForm" class="panel filters"><label>Search<input name="search" type="search" maxlength="100" placeholder="Name, destination, room"></label><label>Flight<input name="flight" maxlength="20" placeholder="All flights"></label><label>Status<select name="status"><option value="">All records</option><option value="ACTIVE">Off campus</option><option value="OVERDUE">Overdue</option><option value="COMPLETED">Checked in</option><option value="ADMIN_CLOSED">Staff closed</option></select></label><label>From date<input name="from" type="date"></label><label>Through date<input name="through" type="date"></label><button class="button" type="submit">Apply filters</button><button class="text-button" id="resetFilters" type="button">Reset</button></form><p id="memberFilter" hidden></p><div id="adminHistory"></div><button id="moreAdminHistory" class="button" hidden>Load more records</button></div>
       <div id="staffUsers" hidden><div class="panel"><h2>Member access</h2><p>Members enter the campus password and set up their own profile. They can reconnect with their profile PIN or a connection code.</p><p class="hint">Resetting access signs that member’s devices out and clears their recovery PIN. Their profile, current status and history are preserved.</p></div><div id="usersList"></div></div>
-      <div id="staffAudit" hidden><p class="hint">Audit entries are retained when records are corrected.</p><div id="auditList"></div><button id="moreAudit" class="button" hidden>Load more events</button></div>
+      <div id="staffAudit" hidden>
+        <section id="dailyReports" class="panel daily-reports" aria-labelledby="reportsHeading" hidden>
+          <h2 id="reportsHeading">Class 27-01 daily spreadsheet</h2>
+          <p class="hint">Saved each evening at 9:00 p.m. Maxwell local time. Includes every account’s profile and latest campus status, sorted by last name.</p>
+          <p id="reportStatus" role="status"></p><div id="reportLatest"></div>
+          <details id="reportArchive" hidden><summary>Previous daily reports</summary><div id="reportDownloads"></div><button id="moreReports" class="button" hidden>Earlier reports</button></details>
+        </section>
+        <p class="hint">Audit entries are retained when records are corrected.</p><div id="auditList"></div><button id="moreAudit" class="button" hidden>Load more events</button>
+      </div>
     </section>
   </main>
   <footer><span>TETHER</span><span>Accountability, simplified.<br>America/Chicago</span></footer>

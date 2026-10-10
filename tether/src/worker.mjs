@@ -2,19 +2,34 @@ import { DurableObject } from 'cloudflare:workers';
 import initial from '../migrations/001_initial.sql';
 import sessions from '../migrations/002_member_sessions.sql';
 import pins from '../migrations/003_profile_pins.sql';
+import reports from '../migrations/004_daily_reports.sql';
+import {captureReport,reportWindow} from './reports.mjs';
+import {CLASSES} from './classes.mjs';
 import { Database } from './database.mjs';
 import { databaseRequest } from './service.mjs';
 import { serveRequest } from './http.mjs';
 import { staffEmails } from './auth.mjs';
 import { digest } from './auth.mjs';
 import { AppError } from './validation.mjs';
-export default { fetch(request,env) {return serveRequest(request,env);} };
+export default {
+  fetch(request,env) {return serveRequest(request,env);},
+  async scheduled(controller,env) {
+    if(!reportWindow(controller.scheduledTime))return;
+    const stub=env.ACCOUNTABILITY.get(env.ACCOUNTABILITY.idFromName(CLASSES['27-01'].object));
+    await stub.dailyReport(controller.scheduledTime);
+  }
+};
 export class Accountability extends DurableObject {
   constructor(ctx,env) {
     super(ctx,env);
-    this.db=new Database(ctx.storage,[{version:1,sql:initial},{version:2,sql:sessions},{version:3,sql:pins}],env.BOOTSTRAP_ADMIN_EMAIL);
+    this.db=new Database(ctx.storage,[{version:1,sql:initial},{version:2,sql:sessions},{version:3,sql:pins},{version:4,sql:reports}],env.BOOTSTRAP_ADMIN_EMAIL);
     this.db.provisionStaff(staffEmails(env));
     this.env=env;
+  }
+  dailyReport(scheduledTime) {
+    // This RPC is callable by our Worker binding, never through a public HTTP route.
+    if(!this.ctx.id.equals(this.env.ACCOUNTABILITY.idFromName(CLASSES['27-01'].object)))throw new AppError('Reports are only available for Class 27-01.',403);
+    return captureReport(this.db,scheduledTime);
   }
   async fetch(request) {
     const response=await databaseRequest(this.db,request,this.env,credentials=>this.connect( credentials));
