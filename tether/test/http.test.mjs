@@ -53,6 +53,23 @@ test('internal staff API independently checks the approved email list',async()=>
     assert.equal(response.status,status);
   }
 });
+
+test('on-demand report enforces staff JWT, class scope, CSRF, disabled accounts and generation rate limits',async()=>{
+  const h=harness({STAFF_EMAILS_27_02:'scoped@example.test'}),path='/staff/api/admin/reports/generate';
+  const jwt={'Cf-Access-Jwt-Assertion':await token()};
+  assert.equal((await h.request(path,{})).status,401);
+  assert.equal((await h.request(path,{}, {...jwt,Origin:'https://untrusted.test'})).status,403);
+  assert.equal((await h.request(path,{}, {...jwt,'X-Tether-Request':''})).status,403);
+  assert.equal((await h.request(path,{}, {'Cf-Access-Jwt-Assertion':await token('scoped@example.test')})).status,403);
+  assert.equal((await h.request('/staff/class/27-02/api/admin/reports/generate',{},jwt)).status,403);
+  const cookies=await h.join();assert.equal((await h.request('/api/admin/reports/generate',{}, {...jwt,Cookie:cookies,'X-Tether-Mode':'staff','X-Verified-Email':'staff@example.test'})).status,403);
+  const response=await h.request(path,{},jwt);assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/spreadsheetml/);
+  assert.match(response.headers.get('X-Robots-Tag'),/noindex/);assert.match(response.headers.get('Cache-Control'),/no-store/);
+  h.db.sql.exec('DELETE FROM limits');
+  for(let i=0;i<30;i++)assert.equal((await h.request(path,{},jwt)).status,200);
+  assert.equal((await h.request(path,{},jwt)).status,429);
+  h.db.sql.exec('UPDATE users SET enabled=0 WHERE id=?',h.staff().id);assert.equal((await h.request(path,{},jwt)).status,403);
+});
 test('password validation, CSRF and server-held sessions protect member setup',async()=>{
   const h=harness();assert.equal((await h.request('/api/unlock',{password:'wrong'})).status,401);
   for(const headers of [{Origin:'https://evil.test'},{'X-Tether-Request':''}])assert.equal((await h.request('/api/unlock',{password:h.env.MEMBER_PASSWORD},headers)).status,403);

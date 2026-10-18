@@ -2,7 +2,7 @@ import { AppError,admin,profile,id,text,phone } from './validation.mjs';
 import { digest,randomToken,sessionCookie,matchesPassword,isStaffEmail,staffClasses } from './auth.mjs';
 import {confirmedPin,pinValue,hashPin,pinFingerprint,sameHash} from './pin.mjs';
 import { json,failure,securityHeaders } from './http.mjs';
-import {listReports,readReport,XLSX_TYPE} from './reports.mjs';
+import {listReports,readReport,generateReport,XLSX_TYPE} from './reports.mjs';
 import { classFor } from './classes.mjs';
 export async function databaseRequest(db,request,env={},liveConnect) {
   try {
@@ -64,13 +64,18 @@ export async function databaseRequest(db,request,env={},liveConnect) {
       db.provisionStaff([actor]);
     }else actor=db.memberPrincipal(gateHash,deviceHash,passwordVersion);
     const user=db.authorize(actor);if(staff)admin(user);
-    db.limit(user,['/api/action','/api/device-code','/api/profile-pin'].includes(path),scaled);
+    db.limit(user,['/api/action','/api/device-code','/api/profile-pin','/api/admin/reports/generate'].includes(path),scaled);
     if(path==='/api/live'&&method==='GET'&&!staff&&scaled&&liveConnect)return liveConnect({userId:user.id,gateHash,deviceHash,passwordVersion});
     if (path==='/access') return json({ok:true});
     if (path==='/api/state' && method==='GET') return json({...db.state(user,scaled),class_id:classroom.id,...(staff?{staff_classes:staffClasses(actor,env)}:{})});
     if(path==='/api/admin/reports'||path.startsWith('/api/admin/reports/')) {
       if(!staff||classroom.id!=='27-01')throw new AppError('Reports require Class 27-01 staff access.',403);
       admin(user);
+      if(path==='/api/admin/reports/generate'){
+        if(method!=='POST')throw new AppError('Use Generate report now to create a current report.',405);
+        const {file,filename}=generateReport(db,user);
+        return new Response(file,{headers:{...securityHeaders,'Content-Type':XLSX_TYPE,'Content-Disposition':`attachment; filename="${filename}"`}});
+      }
       if(path==='/api/admin/reports'&&['GET','POST'].includes(method))return json(listReports(db,user,body?.before));
       const match=path.match(/^\/api\/admin\/reports\/(\d{4}-\d{2}-\d{2})\.xlsx$/);
       if(match&&method==='GET')return new Response(readReport(db,user,match[1]),{headers:{...securityHeaders,'Content-Type':XLSX_TYPE,'Content-Disposition':`attachment; filename="Tether-27-01-${match[1]}.xlsx"`}});

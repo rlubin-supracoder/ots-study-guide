@@ -172,24 +172,34 @@ async function loadReports(append=false){
   const box=$('#reportDownloads');
   for(const [index,report]of data.reports.entries()){
     const card=el('div','report-download');
-    const button=el('button',!append&&index===0?'button primary':'button',`${!append&&index===0?'Download latest':'Download'} · ${report.report_date} (.xlsx)`);
+    const button=el('button','button',`${!append&&index===0?'Latest nightly report':'Download'} · ${report.report_date} (.xlsx)`);
     button.type='button';button.addEventListener('click',guarded(()=>downloadReport(report.report_date,button)));
     card.append(button,el('p','hint',`${report.user_count} accounts · Captured ${dateTime(report.captured_at)}${Date.parse(report.captured_at)-Date.parse(report.scheduled_for)>=60000?' · Delayed capture':''}`));(!append&&index===0?$('#reportLatest'):box).append(card);
   }
   reportsBefore=data.reports.at(-1)?.report_date;
   $('#moreReports').hidden=!data.more;
   $('#reportArchive').hidden=!box.childElementCount;
-  $('#reportStatus').textContent=$('#reportLatest').childElementCount?'Reports preserve the state at the capture time shown.':`The first report will appear after ${dateTime(data.next_at)}. No earlier snapshots are available.`;
+  $('#reportStatus').textContent=$('#reportLatest').childElementCount?'Saved nightly reports preserve the state at the capture time shown.':`The first nightly report will appear after ${dateTime(data.next_at)}. You can generate a current report now.`;
 }
 async function downloadReport(date,button){
-  button.disabled=true;
+  return downloadSpreadsheet(`/api/admin/reports/${date}.xlsx`,button);
+}
+async function downloadSpreadsheet(path,button,body){
+  if(button.disabled)return;
+  const label=button.textContent;button.disabled=true;button.setAttribute('aria-busy','true');
+  if(body!==undefined)button.textContent='Generating report…';
   try{
-    const response=await fetch(apiPrefix+`/api/admin/reports/${date}.xlsx`,{credentials:'same-origin',cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(30000)});
+    let response;
+    try{response=await fetch(apiPrefix+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(30000),headers:body===undefined?{}:{'Content-Type':'application/json','X-Tether-Request':'1'},body:body===undefined?undefined:JSON.stringify(body)});}
+    catch{throw new Error('The report download could not be confirmed. Check your connection and try again.');}
     if(response.type==='opaqueredirect'||response.status===401||response.status===403){lock();throw new Error('Your staff session ended. Sign in again to download the report.');}
-    if(!response.ok)throw new Error('The report could not be downloaded. Please try again.');
+    if(!response.ok){const error=await response.json().catch(()=>null);throw new Error(error?.error||'The report could not be downloaded. Please try again.');}
     if(!response.headers.get('Content-Type')?.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')){lock();throw new Error('Sign in again to download the report.');}
-    const url=URL.createObjectURL(await response.blob()),link=el('a');link.href=url;link.download=`Tether-27-01-${date}.xlsx`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-  }finally{button.disabled=false;}
+    const blob=await response.blob();if(!state)throw new Error('Sign in again to download the report.');
+    const filename=response.headers.get('Content-Disposition')?.match(/filename="(Tether-27-01-[a-zA-Z0-9-]+\.xlsx)"/)?.[1]||'Tether-27-01-report.xlsx';
+    const url=URL.createObjectURL(blob),link=el('a');link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    notice('Excel report download started.');
+  }finally{button.disabled=false;button.textContent=label;button.removeAttribute('aria-busy');}
 }
 async function loadAudit(append=false){const data=await api('/api/admin/audit',{offset:auditOffset});const box=$('#auditList');if(!append)box.replaceChildren();for(const row of data.records){const card=el('article','audit-card');card.append(el('h3','',row.action.replaceAll('_',' ')),el('p','meta',`${dateTime(row.at)} · ${row.actor_email||'System setup'}`));if(row.subject_name)card.append(el('p','',row.subject_name));const detail=el('details');detail.append(el('summary','','View change details'),el('pre','',JSON.stringify(JSON.parse(row.detail),null,2)));card.append(detail);box.append(card);}$('#moreAudit').hidden=!data.more;}
 function manualCheckin(record){const box=modal('Staff check-in'),form=el('form','form-stack');form.append(el('p','',`Confirm ${record.full_name} has returned to campus.`));field(form,'Reason / accountability note','reason','text','',true,240).minLength=3;submit(form,'Check member in');box.append(form);form.addEventListener('submit',async event=>{event.preventDefault();if(await mutate('admin_checkin',{record_id:record.id,reason:form.elements.reason.value}))await refreshStaff();});}
@@ -231,6 +241,7 @@ $('#moreHistory').addEventListener('click',guarded(async()=>{historyOffset+=50;a
 $('#moreAdminHistory').addEventListener('click',guarded(async()=>{adminOffset+=50;await loadHistory(true,true);}));
 $('#moreAudit').addEventListener('click',guarded(async()=>{auditOffset+=50;await loadAudit(true);}));
 $('#moreReports').addEventListener('click',guarded(()=>loadReports(true)));
+$('#generateReport').addEventListener('click',guarded(async()=>{await downloadSpreadsheet('/api/admin/reports/generate',$('#generateReport'),{});if(state){auditOffset=0;await loadAudit();}}));
 setInterval(()=>{if(!document.hidden&&fresh&&view==='admin'&&staffView==='audit'&&now()>=reportRefreshAt)loadReports().catch(error=>notice(error.message,true));},15000);
 if(staffPage)$('#logout').href='/cdn-cgi/access/logout';
 $('#logout').addEventListener('click',guarded(async event=>{if(!staffPage){event.preventDefault();await api('/api/logout',{});location.assign(home);}lock();retries.clear();}));

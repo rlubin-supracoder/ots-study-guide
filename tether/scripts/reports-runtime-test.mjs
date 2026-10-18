@@ -36,7 +36,13 @@ try{
   await mf.dispose();mf=new Miniflare(config);
   response=await call('/api/admin/reports/2026-10-10.xlsx');assert.deepEqual(new Uint8Array(await response.arrayBuffer()),file);
   listing=await(await call('/api/admin/reports')).json();assert.equal(listing.reports.length,1);
+  response=await call('/api/admin/reports/generate',{});assert.equal(response.status,200);
+  assert.match(response.headers.get('Content-Disposition'),/-on-demand\.xlsx/);
+  assert.ok(strFromU8(unzipSync(new Uint8Array(await response.arrayBuffer()))['xl/worksheets/sheet1.xml']).includes('On-demand report.'));
+  assert.equal((await call('/api/admin/reports/generate')).status,405);
+  assert.deepEqual(new Uint8Array(await(await call('/api/admin/reports/2026-10-10.xlsx')).arrayBuffer()),file);
+  const audit=await(await call('/api/admin/audit',{})).json();assert.ok(audit.records.some(row=>row.action==='ON_DEMAND_REPORT_GENERATED'&&row.actor_email==='staff@example.test'));
   assert.equal((await mf.dispatchFetch('https://tether.test/api/admin/reports/2026-10-10.xlsx')).status,401);
   assert.equal((await mf.dispatchFetch('https://tether.test/api/dailyReport')).status,401);
-  console.log('Daily reports runtime passed: scheduled event, DO RPC, SQLite BLOB, XLSX download, duplicate delivery, restart persistence, class isolation and anonymous denial.');
+  console.log('Reports runtime passed: scheduled event, DO RPC, SQLite BLOB, XLSX download, on-demand capture and audit, unchanged nightly archive, duplicate delivery, restart persistence, class isolation and anonymous denial.');
 }finally{await mf.dispose();}

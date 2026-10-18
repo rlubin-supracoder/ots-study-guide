@@ -44,9 +44,11 @@ Open **/staff** and use an approved staff email for email-code sign-in. Staff do
 
 Campus counts include enabled members with completed profiles. Names, flights, rooms and phone numbers are snapshotted at checkout; profile edits do not rewrite historical identities.
 
-## Daily Class 27-01 spreadsheet
+## Class 27-01 spreadsheets
 
 Open **Staff → Audit Trail**. The top panel downloads the latest `.xlsx`; **Previous daily reports** opens the archive. Reports are saved at **21:00 America/Chicago**, following daylight saving. The first file appears at the next scheduled capture after deployment; earlier days are not reconstructed.
+
+**Generate report now** downloads a fresh snapshot at any time, using the same columns and last-name sorting. Its heading and filename identify it as an on-demand report with the server's capture time in Central Time. The file is delivered directly to the staff member's device; the nightly archive remains unchanged. Generation records the staff identity, capture time and account count in the Audit Trail. If the download fails, staff can retry to capture the current state again. The `POST /staff/api/admin/reports/generate` endpoint enforces the existing staff JWT, 27-01 scope, enabled account, CSRF checks and 30-per-minute mutation limit. No new database tables or credentials are required.
 
 Each workbook includes all 27-01 accounts, including disabled accounts and incomplete staff/member profiles. Columns contain last name, full name, flight, room, phone, campus status, overdue flag, latest trip's departure/expected return/arrival/destination, account state, profile completeness, role and account ID. Profile fields reflect capture time; trip fields describe the latest trip. An active trip takes priority. Incomplete profiles without an active trip are marked **PROFILE INCOMPLETE**. Names are sorted by the surname inferred from the stored full name (comma notation and common suffixes/particles supported), then full name. The source full name remains unchanged; accounts without names sort last. Compound names may require staff review because profiles have a single full-name field.
 

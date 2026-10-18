@@ -58,7 +58,9 @@ export function buildReport(rows,metadata) {
   }).join('');
   const end=Math.max(8,sorted.length+7);
   const counts=`${sorted.length} accounts. ${sorted.filter(u=>status(u)==='ON CAMPUS').length} on campus. ${sorted.filter(u=>status(u)==='OFF CAMPUS').length} off campus. ${sorted.filter(u=>overdue(u,metadata.captured_at)).length} overdue. ${sorted.filter(u=>!complete(u)).length} incomplete profiles.`;
-  sheet=sheet.replace(styleRow,data).replace('{{scheduled}}',escape(displayFormat.format(new Date(metadata.scheduled_for)))).replace('{{captured}}',escape(displayFormat.format(new Date(metadata.captured_at)))).replace('{{counts}}',escape(counts));
+  if(metadata.on_demand)sheet=sheet.replace('Scheduled: {{scheduled}}. ','On-demand report. ');
+  else sheet=sheet.replace('{{scheduled}}',escape(displayFormat.format(new Date(metadata.scheduled_for))));
+  sheet=sheet.replace(styleRow,data).replace('{{captured}}',escape(displayFormat.format(new Date(metadata.captured_at)))).replace('{{counts}}',escape(counts));
   sheet=sheet.replace('</x:sheetData>',`</x:sheetData><x:autoFilter ref="A7:O${end}" />`);
   sheet=sheet.replace('sqref="F8:F8"',`sqref="F8:F${end}"`).replace('sqref="G8:G8"',`sqref="G8:G${end}"`);
   sheet=sheet.replace('text="OFF CAMPUS" />','text="OFF CAMPUS"><x:formula>NOT(ISERROR(SEARCH("OFF CAMPUS",F8)))</x:formula></x:cfRule>').replace('text="Yes" />','text="Yes"><x:formula>NOT(ISERROR(SEARCH("Yes",G8)))</x:formula></x:cfRule>');
@@ -66,16 +68,29 @@ export function buildReport(rows,metadata) {
   return zipSync(Object.fromEntries(Object.entries(files).map(([name,xml])=>[name,strToU8(xml)])),{level:6});
 }
 
+function snapshotRows(db) {
+  return db.rows(`SELECT u.id,u.full_name,u.flight_number,u.room_number,u.phone_number,u.enabled,u.role,
+    c.status AS trip_status,c.destination,c.checked_out_at,c.expected_return_at,c.checked_in_at
+    FROM users u LEFT JOIN checkouts c ON c.id=(SELECT id FROM checkouts WHERE user_id=u.id
+    ORDER BY (status='ACTIVE') DESC,COALESCE(checked_in_at,checked_out_at) DESC,checked_out_at DESC,id DESC LIMIT 1)`);
+}
+export function generateReport(db,user) {
+  admin(user);
+  return db.storage.transactionSync(()=>{
+    const captured_at=db.clock(),rows=snapshotRows(db);
+    const file=buildReport(rows,{captured_at,on_demand:true}),p=parts(captured_at);
+    const filename=`Tether-27-01-${dateKey(p)}-${p.hour}${p.minute}${p.second}-on-demand.xlsx`;
+    db.audit(user.id,null,null,'ON_DEMAND_REPORT_GENERATED',{captured_at,user_count:rows.length,filename},captured_at);
+    return {file,filename};
+  });
+}
 export function captureReport(db,scheduledTime) {
   const window=reportWindow(scheduledTime),captured_at=db.clock();
   // Never label a later day's current state as a missed historical snapshot.
   if(!window||reportWindow(Date.parse(captured_at))?.report_date!==window.report_date)return null;
   return db.storage.transactionSync(()=>{
     if(db.one('SELECT report_date FROM daily_reports WHERE report_date=?',window.report_date))return {created:false,report_date:window.report_date};
-    const rows=db.rows(`SELECT u.id,u.full_name,u.flight_number,u.room_number,u.phone_number,u.enabled,u.role,
-      c.status AS trip_status,c.destination,c.checked_out_at,c.expected_return_at,c.checked_in_at
-      FROM users u LEFT JOIN checkouts c ON c.id=(SELECT id FROM checkouts WHERE user_id=u.id
-      ORDER BY (status='ACTIVE') DESC,COALESCE(checked_in_at,checked_out_at) DESC,checked_out_at DESC,id DESC LIMIT 1)`);
+    const rows=snapshotRows(db);
     const file=buildReport(rows,{...window,captured_at});
     if(file.byteLength>1800000)throw new Error('Daily report exceeds storage limit.');
     db.sql.exec('INSERT INTO daily_reports(report_date,scheduled_for,captured_at,user_count,file) VALUES (?,?,?,?,?)',window.report_date,window.scheduled_for,captured_at,rows.length,file);

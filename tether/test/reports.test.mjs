@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {unzipSync,strFromU8} from 'fflate';
 import {fixture,storage,migrations} from './helpers.mjs';
 import {Database} from '../src/database.mjs';
-import {buildReport,captureReport,lastName,sortedUsers,reportWindow,nextReportAt,listReports,readReport,XLSX_TYPE} from '../src/reports.mjs';
+import {buildReport,captureReport,generateReport,lastName,sortedUsers,reportWindow,nextReportAt,listReports,readReport,XLSX_TYPE} from '../src/reports.mjs';
 import {databaseRequest} from '../src/service.mjs';
 import {digest} from '../src/auth.mjs';
 
@@ -55,6 +55,29 @@ test('late reports disclose actual capture and stale schedules cannot fabricate 
   f.setTime('2026-09-27T02:00:00.000Z');assert.equal(captureReport(f.db,Date.parse(time)),null);
   f.setTime('2026-09-26T03:00:00.000Z');assert.equal(captureReport(f.db,Date.parse(time)),null);
 });
+test('staff can generate a fresh daytime snapshot without changing nightly archives or accountability data',()=>{
+  const f=prepared();captureReport(f.db,Date.parse(time));
+  const saved=readReport(f.db,f.staff(),'2026-09-25');
+  f.setTime('2026-09-26T17:34:56.000Z');
+  const first=generateReport(f.db,f.staff());
+  assert.equal(first.filename,'Tether-27-01-2026-09-26-123456-on-demand.xlsx');
+  assert.match(xml(first.file),/On-demand report\. Captured: Sep 26, 2026, 12:34:56 PM CDT/);
+  assert.ok(!xml(first.file).includes('Scheduled:'));assert.ok(!xml(first.file).includes('{{'));
+  const active=f.db.one("SELECT id FROM checkouts WHERE status='ACTIVE'");f.send('b@example.test','checkin',{record_id:active.id});
+  const before=JSON.stringify(['users','checkouts','sessions','profile_pins'].map(table=>f.db.rows('SELECT * FROM '+table)));
+  const second=generateReport(f.db,f.staff());assert.ok(xml(first.file).includes('OFF CAMPUS'));assert.ok(!xml(second.file).includes('<x:t xml:space="preserve">OFF CAMPUS'));
+  assert.equal(JSON.stringify(['users','checkouts','sessions','profile_pins'].map(table=>f.db.rows('SELECT * FROM '+table))),before);
+  assert.deepEqual(readReport(f.db,f.staff(),'2026-09-25'),saved);assert.equal(listReports(f.db,f.staff()).reports.length,1);
+  const audit=f.db.rows("SELECT * FROM audit WHERE action='ON_DEMAND_REPORT_GENERATED'");assert.equal(audit.length,2);
+  assert.equal(audit[0].actor_id,f.staff().id);assert.deepEqual(JSON.parse(audit[0].detail),{captured_at:'2026-09-26T17:34:56.000Z',user_count:4,filename:first.filename});
+  assert.throws(()=>generateReport(f.db,{role:'member'}));
+});
+test('failed on-demand capture records no successful export event',()=>{
+  const f=prepared(),rows=f.db.rows.bind(f.db);
+  f.db.rows=(query,...args)=>{if(query.includes('c.status AS trip_status'))throw new Error('Simulated database failure');return rows(query,...args);};
+  assert.throws(()=>generateReport(f.db,f.staff()),/Simulated/);
+  assert.equal(f.db.one("SELECT COUNT(*) n FROM audit WHERE action='ON_DEMAND_REPORT_GENERATED'").n,0);
+});
 test('report migration preserves every prior table, session, PIN and active trip',()=>{
   const f=prepared();f.db.sql.exec('DROP TABLE daily_reports');f.db.sql.exec('DELETE FROM schema_migrations WHERE version=4');
   const tables=['users','checkouts','sessions','profile_pins','audit','metadata'];
@@ -93,6 +116,12 @@ test('only approved 27-01 staff can list/download; anonymous, members and scoped
   const pass=await digest(env.MEMBER_PASSWORD);f.db.createSession('gate','gate',null,pass);f.db.createSession('device','device',f.staff().id);
   const device={'X-Member-gate':'gate','X-Member-device':'device'};
   assert.equal((await call(path,device)).status,403);
+  const generate='/api/admin/reports/generate';
+  for(const [headers,expected]of [[{},401],[device,403],[{'X-Tether-Mode':'staff','X-Verified-Email':'second@example.test'},403],[{...staff,'X-Tether-Class':'27-02'},403]])assert.equal((await call(generate,headers,'POST')).status,expected);
+  assert.equal((await call(generate,staff)).status,405);
+  const current=await call(generate,staff,'POST');assert.equal(current.status,200);assert.equal(current.headers.get('Content-Type'),XLSX_TYPE);
+  assert.match(current.headers.get('Content-Disposition'),/-on-demand\.xlsx/);assert.match(current.headers.get('Cache-Control'),/no-store/);
+  assert.match(xml(await current.arrayBuffer()),/On-demand report/);
   const response=await call(path,staff);assert.equal(response.status,200);assert.equal(response.headers.get('Content-Type'),XLSX_TYPE);
   assert.match(response.headers.get('Cache-Control'),/no-store/);assert.match(response.headers.get('Content-Disposition'),/attachment/);assert.match(response.headers.get('X-Robots-Tag'),/noindex/);
   assert.ok((await response.arrayBuffer()).byteLength>1000);
