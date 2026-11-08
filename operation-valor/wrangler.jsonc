@@ -2,12 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "operation-valor",
   "account_id": "930c639ccd874fcb5c1de90de6d61363",
-  "routes": [
-    {
-      "pattern": "valor.russelllubinski.us",
-      "custom_domain": true
-    }
-  ],
+  "routes": [],
   "main": "src/worker.mjs",
   "compatibility_date": "2026-09-19",
   "workers_dev": false,

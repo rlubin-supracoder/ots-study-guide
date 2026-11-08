@@ -1,5 +1,7 @@
 # OPS spreadsheet summary
 
+Retired November 8, 2026. Public access is disabled. The following documentation describes the archived application; see [retirement notes](../RETIREMENT.md) before any deployment.
+
 Russell Lubinski, 27-01
 
 Read-only red-cell reporting at https://ops.russelllubinski.us.

@@ -1,5 +1,7 @@
 # Tether
 
+Retired November 8, 2026. Public access and nightly reports are disabled. Stored records are retained. The following documentation describes the archived application; see [retirement notes](../RETIREMENT.md) before any deployment.
+
 OTS accountability at https://tether.russelllubinski.us. Staff: https://tether.russelllubinski.us/staff.
 
 ## Classes

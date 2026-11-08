@@ -2,6 +2,4 @@
 
 Russell Lubinski, 27-01
 
-[Open OTS Trainer](https://rlubin-supracoder.github.io/ots-study-guide/)
-
-SPINS flashcards, academic questions, concept cards, practice tests, and a study guide.
+Retired November 8, 2026. Public sites are offline; source code is retained.

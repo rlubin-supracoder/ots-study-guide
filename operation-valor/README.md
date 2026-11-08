@@ -1,5 +1,7 @@
 # Operation Valor
 
+Retired November 8, 2026. Public access is disabled. The following documentation describes the archived application; see [retirement notes](../RETIREMENT.md) before any deployment.
+
 Russell Lubinski, 27-01
 
 Operation Valor is a shared location check-in tool for the OTS land navigation exercise. Each participant gets a number when they join. When someone sends a check-in, their latest position appears as a numbered marker on a map that the whole joined team and the exercise admin can see. This is a check-in system, not continuous tracking.
